@@ -1,0 +1,36 @@
+---
+title: "Statistics in R - Data Camp Course"
+author: "Carter Wolff"
+date: "2023-06-11"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Uniform Distribution
+-A uniform distribution can be continuous or discrete, where each outcome shares an equal probability as another (i.e., rolling a single die)
+-The expected value of a distribution can be calculated by summing the value of each outcome and its probabilty. For example, the expected value of rolling a single, six-side die is (1 * (1/6)) + (2 * (1/6)) + (3 * (1/6)) + (4 * (1/6)) + (5 * (1/6)) + (6 * (1/6)) = 3.5
+```{r}
+# Calculate probability of waiting 10-20 mins for a bus, assuming the bus can arrive at any time with 0-30 minutes (continuous uniform distribution)
+#probability = prob of waiting < 20 minutes - prob of waiting < 10 minutes
+prob_between_10_and_20 <- punif(20, 0, 30) - punif(10, 0, 30)
+prob_between_10_and_20
+?runiu
+
+```
+Binomial Distribution - Discrete
+-The binomial distribution is used when an trial has two possible outcomes (i.e., heads or tails) where the user wants to know the number of successes in "n" number of trials. A common example of this is when an individual wants to know how many times will you flip heads out of 100 coin flips.
+-In r, you can generate a binomial distribution using rbinom. The arguments of rbinom are as follows: rbinom(# Trials, # of events per trial, prob of success)
+-Flipping 1 coin 30 times: rbinom(30, 1, 0.5) - this returns a vector that counts the number of success in each trial. The vector position equals the trial #
+-Flipping 30 coins, 1 time each: rbinom(1, 30, 0.5) - this returns a single value of how many successes in the single trial
+-The expected value of a binomial distribution equals n * p, where n is equal to the total number of trials and p is the probability of success
+
+Normal Distribution - continuous
+-described by two parameters: mean and standard deviation
+-like the uniform distribution, you can calculate the probability of given ranges in the data set. For example, imagine a data set of heights of women in cms. You can calculate the probability of women being under 154 cms as: pnorm(154, mean = "x", sd = "y"). You need to specifiy or calculate the values of mean and sd, from your sample.
+-The probability of women height being between 170 and 154 is: pnorm(170, mean, sd) - pnorm(154, mean, sd)
+-qnorm can be used to return the x value found for a given quantile. To find the height where 90% of women are shorter than, use qnorm(0.9, mean, sd)
+-lower.tail works here like the previous stated examples. If lower.tail = FALSE is specified, your norm funtion will return greater than the specified metric instead of less than.
+

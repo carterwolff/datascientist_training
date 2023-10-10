@@ -1,0 +1,77 @@
+---
+title: "Exploratory Data Analysis in R - Statistics in R Datacamp"
+author: "Carter Wolff"
+date: "2023-06-27"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---Exploring Categorical Data
+More Cleaning and Initial Review of Data
+-One practice of cleaning and exploring data is reviewing the levels of a variable. The levels are the different outcomes of a variable. For example, size can have multiple categorical levels like small, medium, and large. The levels() allows you to view all the levels for a given variable.
+-dplyr contains functions to manipulate these levels, such as the droplevels() function. droplevels() only filters out levels that are not in a data set, meaning the levels you wish to drop should be filtered out using filter() before using the droplevels() function.
+
+Counts versus Proportions
+-prop.table() can convert the table() results into proportions. In the standard prop.table() call, all values across all rows sum to 1. 
+-conditional proportions evaluate data strictly across rows or columns. This means that the sum of a row or column is 1 rather than the entire table.
+  -To specify rows, include a 1 after the table argument in prop.table(); for columns, include a 2:
+    prop.table(tablename, 1) is condition on rows; prop.table(tablename, 2) is conditions on columns
+  -conditional proportions are good to evaluate the association between two variables.
+
+---Exploring Numerical Data
+Visualizing data in higher dimensions
+-facet_wrap or facet_grid gives options to plot by a third variable, as does using the multiple shape/color/fills options within ggplot
+
+---Email Case study
+-Using data from the openinto package in R
+
+```{r}
+# Load packages
+library(dplyr)
+library(ggplot2)
+library(openintro)
+
+# Compute summary statistics for spam and not spam emails
+email %>%
+  group_by(spam) %>%
+  summarise(median(num_char), IQR(num_char))
+
+# Create plot to compare number of characters in spam and non spam emails where number of characters is log transformed
+email %>%
+  mutate(log_num_char = log(num_char)) %>%
+  ggplot(aes(x = spam, y = log_num_char)) +
+  geom_boxplot()
+
+###comparison of exclamation marks used in spam and non spam emails. 
+# Compute center and spread for exclaim_mess by spam
+email %>%
+  group_by(spam) %>%
+  summarize(median(exclaim_mess),
+            IQR(exclaim_mess))
+
+# Create plot for spam and exclaim_mess
+email %>%
+  mutate(log_exclaim_mess = log(exclaim_mess + 0.01)) %>%
+  ggplot(aes(x = log_exclaim_mess)) +
+  geom_histogram() +
+  facet_wrap(~ spam)
+
+# Alternative plot: side-by-side box plots
+email %>%
+  mutate(log_exclaim_mess = log(exclaim_mess + 0.01)) %>%
+  ggplot(aes(x = 1, y = log_exclaim_mess)) +
+  geom_boxplot() +
+  facet_wrap(~ spam)
+
+# Alternative plot: Overlaid density plots
+email %>%
+  mutate(log_exclaim_mess = log(exclaim_mess + .01)) %>%
+  ggplot(aes(x = log_exclaim_mess, fill = spam)) +
+  geom_density(alpha = 0.3)
+```
+
+Approach to zero inflated datasets
+-morph into categorical variable with two levels. Zero and non-zero. Can aproach the analyses of these separately. 

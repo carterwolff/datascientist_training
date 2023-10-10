@@ -1,0 +1,322 @@
+---
+title: "Unsupervised Learning in R"
+author: "Carter Wolff"
+date: "2023-07-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readxl)
+library(dplyr)
+
+
+pokemon_all <- read_excel("pokemon.xlsx")
+wisc.df <- read_excel("WisconsinCancer.xlsx")
+```
+
+---Chapter 1: Unspervised Learning in R
+Unsupervised learning attempts to find data with unlabeled data (i.e., data without a labeled response metric)
+-Goals of unsupervised learning
+  -Clustering: find homogeneous subgroups within the larger group
+  -Find patterns in the features of the data
+    -allows one to visualize higher diimensional data
+  -Preprocess data for supervised learning later on
+  -there is no single goal of supervised learning, the objective is to look for any patterns that may or may not exist with the given data
+
+Introduction to k-means clustering
+-we initially break observations into pre-defined number of clusters and then assign observations to the clusters
+-k-means in R is called with base R using the kmeans() function
+  -kmeans accepts three arguments: kmeans(x, centers = , nstart =)
+    -x = matrix of data points
+    -centers = number of clusters to group observations into
+    -nstart = how many times to repeat the k-means clustering
+        -since there is randomness in k-means clustering, one should run the algorithm multiple times
+
+How k-means works and practical matters
+-the k-means algorithm uses the total within cluster sum of squares metric to evaluate which iteration is best
+  -for each observation in the model, the sum of squares is calculated as the euclidean distance between each observation in the cluster and the cluster center
+-you can determine the optimal number of clusters to choose with a Scree plot. 
+  -this plot is an increasing number of clusters on the x axis (from 1 to some number) and the total within sum of squares on the y axis
+    -as clusters increase, the total sum of squares SHOULD decrease to a point. That value is the optimal number of clusters for your model
+    
+k-means Clustering with the pokemon data
+-The following code attempts to cluster unlabeled pokemon data. That data contains six variables, which represent different attributes of a pokemon
+  -the first step is to decide on how many clusters to use with the help of a Scree plot
+  -after, we use that value of k to build our model and plot the results
+  
+```{r}
+# Initialize total within sum of squares error: wss
+wss <- 0
+i <- 0
+set.seed(1)
+
+#create an unlabeled data set from the raw pokemon data set
+pokemon <- pokemon_all %>%
+  select(HitPoints, Attack, Defense, SpecialAttack, SpecialDefense, Speed)
+
+# Look over 1 to 15 possible clusters
+for (i in 1:15) {
+  # Fit the model: km.out
+  km.out <- kmeans(pokemon, centers = i, nstart = 20, iter.max = 50)
+  # Save the within cluster sum of squares
+  wss[i] <- km.out$tot.withinss
+}
+
+# Produce a scree plot
+plot(1:15, wss, type = "b", 
+     xlab = "Number of Clusters", 
+     ylab = "Within groups sum of squares")
+
+# Select number of clusters
+k <- 2
+
+# Build model with k clusters: km.out
+km.out <- kmeans(pokemon, centers = 2, nstart = 20, iter.max = 50)
+
+# View the resulting model
+km.out
+
+# Plot of Defense vs. Speed by cluster membership
+plot(pokemon[, c("Defense", "Speed")],
+     col = km.out$cluster,
+     main = paste("k-means clustering of Pokemon with", k, "clusters"),
+     xlab = "Defense", ylab = "Speed")
+```
+
+---Chapter 2: Hierarchical Clustering
+Hierarchical clustering is used when the number of clusters is not known before
+  -two types of hierarchical clustering
+    -bottom-up: each point is assigned to its own cluster
+      -the model then finds the closest two clusters and groups them together
+      -the model continues until only 1 cluster is left. 
+-preforming hierarchical clustering in R only requires the distance of the variables in the data. This is calculated with the dist(x) function which returns a matrix of distances
+-the distance matrix is passed to the hclust() function as hclust(d = dist_matrix)
+
+Selecting the Number of Clusters in R
+-you can visualize the clustering algorithm with a dendrogram. The dendrogram builds a tree depicting each iteration of clustering until all values are in one cluster
+  -think of this like a reverse cladogram with the single entity at the top rather than the bottom
+  -you can creat a dendrogram by passing the hclust() model to plot()
+-To determine the number of clusters to use for the model, you can draw a horizontal line on the dendrogram with abline(h = height)
+  -the height is the height of the dendrogram which is a representation of the number of clusters drawn
+-you can also use the cutree() to assign clusters to the dataset,
+  -cutree() takes the model name and either h = or k = 
+    -h = the height as it appears on the dendrogram
+    -k = number of clusters to use in the model
+
+Clustering linkage
+-four methods to measure distance between observations
+  -complete (default): pairwise similarity calculated for all observations in the clusters. The largest of similarities is used for the next cluster
+  -single: same as complete, but uses the smallest of similarities
+  -average: same as complete, but uses the average of the similarities
+  -centeroid: finds centroid of cluster 1 and centroid of cluster 2. Uses similarity between two centroids
+  -specifying the type of linkage in R requires the method = that takes strings such as "complete" "average" "single" etc...
+-machine learning algorithms are sensitive to variables of different scales. Thus it is common to provide a transformation to the data, such as a linear transformation
+  -for linear transformation, subtract the mean from all observations, then divide by the standard deviation
+  -this is also referred to as normalization
+  -colMeans() is a quick way to check the means of all values in the matrix
+  -apply(x, 2, sd) will do the same for standard deviation. The 2 specifies the second axis, which is the column
+  -scale(x) will normalize all the values in the data set
+-The code below creates a hierarchical cluster model of the pokemon data after normalizing it for each variable
+
+```{r}
+# View column means
+colMeans(pokemon)
+
+# View column standard deviations
+apply(pokemon, 2, sd)
+
+# Scale the data
+pokemon.scaled <- scale(pokemon)
+
+# Create hierarchical clustering model: hclust.pokemon
+hclust.pokemon <- hclust(dist(pokemon.scaled), method = "complete")
+
+# Apply cutree() to hclust.pokemon: cut.pokemon
+cut.pokemon <- cutree(hclust.pokemon, k = 3)
+
+```
+
+  
+---Chapter 3: Dimensionality reduction with PCA
+-Three goals of PCA
+  -Find a linear combination of the linear features
+    -This is done by taking a fraction of all features and adding them together. This is reffered to as a Principle Component (i.e., PC1 and PC2)
+  -Maintain most of the variance in the data
+  -Principal components are uncorrelated 
+-PC model in R calls the prcom() function
+  -prcomp(x = , scale = , center = )
+    -x = dataset
+    -scale = TRUE/FALSE should the data be normalized (mean = 0, sd = 1)
+    -center = TRUE/FALSE should the center be around zero, usually left true
+  -summary(prmodel) gives the amount of variation explained by each of the principle components
+
+```{r}
+# Perform scaled PCA: pr.out on the pokemon data set
+pr.out <- prcomp(pokemon, scale = TRUE, center = TRUE)
+
+# Inspect model output
+summary(pr.out)
+
+
+```
+Visualizing PCA Results
+-Biplots
+  -Biplots show all the original observations mapped onto a PC plot, along with line vectors that represent each original variable
+-Scree Plot one of two methods
+  -proportion of variance explained for each principle component. The line decreases as more principle components are included because latter components do not explain as much variation of the data compared to earlier components
+  -cumulative variance versus principal components. Essentially the inverse of the proprotion of variance explained, as this value should sum to 1
+-creating a biplot in R is used with biplot(pcmodel_name)
+-creating a scree plot
+  -access the standard deviation from the model as pr.model$sdev
+    -square this to get the variance: pr.var <- pr.model$sdev^2
+    -get the proportion of variance for each component: pve <- pr.var / sum(pr.var)
+
+```{r}
+# Perform scaled PCA: pr.out on the pokemon data set
+pr.out <- prcomp(pokemon, scale = TRUE, center = TRUE)
+
+# Inspect model output
+summary(pr.out)
+
+# Variability of each principal component: pr.var
+pr.var <- pr.out$sdev^2
+
+# Variance explained by each principal component: pve
+pve <- pr.var / sum(pr.var)
+
+# Plot variance explained for each principal component
+plot(pve, xlab = "Principal Component",
+     ylab = "Proportion of Variance Explained",
+     ylim = c(0, 1), type = "b")
+
+# Plot cumulative proportion of variance explained
+plot(cumsum(pve), xlab = "Principal Component",
+     ylab = "Cumulative Proportion of Variance Explained",
+     ylim = c(0, 1), type = "b")
+```
+
+Practical issues of using PCA
+-Dealing with scaling with data
+-Handling Missing Values
+  -drop missing values
+  -impute/estimate missing values
+-Handling Categorical Data
+  -Do not use the categorical data
+  -encode the data to a numerical value
+```{r}
+#comparing pca models with and without scaling
+# Mean of each variable
+colMeans(pokemon)
+
+# Standard deviation of each variable
+apply(pokemon, 2, sd)
+
+# PCA model with scaling: pr.with.scaling
+pr.with.scaling <- prcomp(pokemon, center = TRUE, scale = TRUE)
+
+# PCA model without scaling: pr.without.scaling
+pr.without.scaling <- prcomp(pokemon, center = TRUE)
+
+# Create biplots of both for comparison
+biplot(pr.with.scaling)
+biplot(pr.without.scaling)
+```
+
+---Chapter 4: Case Study
+This case study revolves around the Wisconsin data set which contains information about different tumor measurements. The goal will be to explore PCA, k-means, and hierarchical approaches to analysing unstructured data
+
+```{r}
+# Convert the features of the data: wisc.data while removing the labeled values of the data set
+wisc.data <- as.matrix(wisc.df[,3:32])
+
+# Set the row names of wisc.data
+row.names(wisc.data) <- wisc.df$id
+
+# Create diagnosis vector
+diagnosis <- as.numeric(wisc.df$diagnosis == "M")
+
+# Check column means and standard deviations
+colMeans(wisc.data)
+apply(wisc.data, 2, sd)
+
+# Execute PCA, scaling if appropriate: wisc.pr - given variation of mean and sd of features, scaling is appropriate
+wisc.pr <- prcomp(wisc.data, center = TRUE, scale = TRUE)
+
+# Look at summary of results
+summary(wisc.pr)
+
+# Create a biplot of wisc.pr
+biplot(wisc.pr)
+
+# Scatter plot observations by components 1 and 2 - recall that $x access the principal components from the model
+plot(wisc.pr$x[, c(1, 2)], col = (diagnosis + 1), 
+     xlab = "PC1", ylab = "PC2")
+
+# Repeat for components 1 and 3
+plot(wisc.pr$x[, c(1, 3)], col = (diagnosis + 1), 
+     xlab = "PC1", ylab = "PC3")
+
+# Set up 1 x 2 plotting grid
+par(mfrow = c(1, 2))
+
+# Calculate variability of each component
+pr.var <- wisc.pr$sdev^2
+
+# Variance explained by each principal component: pve
+pve <- pr.var / sum(pr.var)
+
+# Plot variance explained for each principal component
+plot(pve, xlab = "Principal Component", 
+     ylab = "Proportion of Variance Explained", 
+     ylim = c(0, 1), type = "b")
+
+# Plot cumulative proportion of variance explained
+plot(cumsum(pve), xlab = "Principal Component", 
+     ylab = "Cumulative Proportion of Variance Explained", 
+     ylim = c(0, 1), type = "b")
+
+#hierarchical clustering approach to wisc data
+# Scale the wisc.data data: data.scaled
+data.scale <- scale(wisc.data)
+
+# Calculate the (Euclidean) distances: data.dist
+data.dist <- dist(data.scale)
+
+# Create a hierarchical clustering model: wisc.hclust
+wisc.hclust <- hclust(data.dist, method = "complete")
+
+# Cut tree so that it has 4 clusters: wisc.hclust.clusters
+wisc.hclust.clusters <- cutree(wisc.hclust, k = 4)
+
+# Compare cluster membership to actual diagnoses
+table(wisc.hclust.clusters, diagnosis)
+
+
+#kmeans model approach to wisc data
+# Create a k-means model on wisc.data: wisc.km
+wisc.km <- kmeans(scale(wisc.data), centers = 2, nstart = 20)
+
+# Compare k-means to actual diagnoses
+table(wisc.km$cluster, diagnosis)
+
+# Compare k-means to hierarchical clustering
+(table(wisc.km$cluster, wisc.hclust.clusters))
+
+# Create a hierarchical clustering model: wisc.pr.hclust
+wisc.pr.hclust <- hclust(dist(wisc.pr$x[, 1:7]), method = "complete")
+
+# Cut model into 4 clusters: wisc.pr.hclust.clusters
+wisc.pr.hclust.clusters <- cutree(wisc.pr.hclust, k = 4)
+
+# Compare to actual diagnoses
+table(diagnosis, wisc.pr.hclust.clusters)
+
+# Compare to k-means and hierarchical
+table(diagnosis, wisc.hclust.clusters)
+table(diagnosis, wisc.km$cluster)
+```
+

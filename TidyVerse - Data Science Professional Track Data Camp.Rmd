@@ -1,0 +1,150 @@
+---
+title: "Tidyverse - Statistician Track Data Camp"
+author: "Carter Wolff"
+date: "2023-05-30"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Using the gapminder dataset to explore tidyverse techniques for visualizing and manipulating data
+
+```{r}
+library(tidyverse)
+library(gapminder)
+library(dplyr)
+```
+---Verbs allow you to visualize subsections of data in your data set
+-Verbs require a pipe operator, %>%, which is denoted after specifying the dataset you want to apply the verb to
+-you can apply multiple verbs to a data set. after each verb, you must include a new %>%
+
+The Filter Verb
+-filter is a function to select a subsection of your dataset to display (i.e., filter by year)
+-filter returns a new dataset printed to the r console
+
+The Arrange Verb
+-arrange allows you to sort the data set based on ascending or descending order of a variable
+-by default, arrange will sort in ascending order. To sort by descending, use the desc() verb inside the arrange() verb
+
+The Mutate Verb
+-mutate allows you to change a variable or add a new variable in the data set
+-inside the mutate verb, you can apply a action to change the original value. Since a new dataframe is returned, the original dataset is NOT altered
+-to add a new column, you can specify a new variable name inside the mutate function. The variable name cannot contain spaces
+
+The Summarize Verb
+-summarize allows you to coalesce multiple rows into a single data point, based on a function that you specify in the summarize verb
+-you can also use filter to select for specific sections of your data. This is done similar to using other verbs together, with %>% after each verb
+
+The group_by Verb
+-group_by can be used in combination of other verbs to apply the verb to each group specified in the group_by verb. 
+  -This is similar to filtering before another verb, but group_by allows you to apply the verb to all levels of a factor (i.e., all years instead of just year 1957)
+
+```{r}
+gapminder %>%
+  filter(country == "United States")
+
+# Filter for the year 1957, then arrange in descending order of population
+gapminder %>%
+    filter(year == "1957") %>%
+    arrange(desc(pop))
+
+
+```
+
+---Using ggplot2 to visualize data
+
+Different aesthetics for ggplot
+-outside of x and y aesthetics, ggplot allows more aesthetics to communicate more information. There are many aesthetics in ggplot, such as color, size, fill, etc...
+-faceting allows you to divide plots into smaller plots separated by a specified factor. This requires "facet_wrap(~ defined variable)"
+
+-since the verbs used above return a new data set, you can use the new data sets to visualize the summarized data
+-this works the same way as before since the object ggplot is using as source data is the same
+
+```{r}
+# Scatter plot comparing gdpPercap and lifeExp, with color representing continent
+# and size representing population, faceted by year
+ggplot(gapminder, aes(x = gdpPercap, y = lifeExp, color = continent, size = pop))+
+    geom_point()+
+    scale_x_log10()+
+    facet_wrap(~ year)
+```
+
+
+---Dplyr Course Data Camp
+The introduction to dplyr course uses the 2015 US Census data set for exercises
+
+Select Verb
+-the select verb allows you to specify specific columns (variables) in your data set that you wish to work with. Thus you can omit additional variables that you don't intend to work with. This allows you to consolidate your data set with only the variables that are relevant to your question
+
+The Count Verb
+-The count verb counts the number of observations. You can pass a variable inside the count verb to count the number of observations within each variable. For example, you can count the number of counties by state, you would use count(state)
+-count also contains an argument, wt. This allows you to apply a weight to each count. You can use this to modify the count of observations by whichever coefficient you specify, such as applying a population weight to the count of each state
+
+The slice_min and slice_max verbs
+-the slice_min and slice_max verbs return the extreme observations of the variable that you specify
+-it takes two arguments: the variable that you wish to apply the slice to and "n=" wish specifies the number of observations you return for min/max
+
+The Transmute verb
+-combination of select and mutate, returns a subsection of columns in the date set and allows mutation on a column
+
+
+---Joining Data Across Multiple Datasets with dplyr Course Data Camp
+This course begins with the LEGOs database that contains data on sets, parts, themes, and colors of LEGOs. The database will be used to introduce different methods to join tables in R.The database contains multiple datasets, which correspond to the different tables referenced in the DataCamp course.
+
+The inner_join Verb
+-This verb allows you to link two tables together using a common variable that is found in each dataset (the variable name does NOT have to be the same). To do this, use the piping function like you have before with other verbs.
+
+table_1 %>%
+  inner_join(table_2, by = c("tbl1_varname" = "tbl2_varname"))
+  
+-The above code will link tables 1 and 2 together using the specified variables in the "by =" statement. If any variables from table 1 and 2 are named the same, they will be given a suffix of ".x" and ".y" (i.e., "name.x" and name.y"). You can avoid this with the "suffix =" in the inner_join verb. This will apply the specifed nomenclature to identical variable names. The beest way to do so is to partition identical names by their original table source. See below.
+
+table_1 %>%_
+  inner_join(table_2, by = c("tbl1_varname" = "tbl2_varname"), suffix = c("_table1", "_table2"))
+
+-Now if you link table 1 and 2 together with the above code, the resulting table will include _table1 or _table2 suffixes on any identical variable names, such as "name_table1" or name_table2."
+-you can pipe multiple inner_join lines together to join more than two tables together by different comparison variables
+
+The left_join verb
+-the inner_join verb only keeps observations that are present in BOTH tables. If you wish to join tables while keeping all of the observations from one of the tables (despite if they have a match in the other table or not), then you can use a directional join verb like left_join.
+-left_join behaves similar to inner_join, except that all observations in the first table specified in the pipe. It still unites tables 1 and 2 based on the "by =" statement. If there is not an identical observation in table 2, an NA will be seen.
+
+The right_join verb
+-similar verb to left_join except now the right_join keeps all observations in the second table (right table) regardless if they appear in the first (left) table.
+-this right table may be appropriate if you wish to view which variables from your first data set do not have an observation for your newly applied theme. This usually means that you will see right_join paired with other piping verbs, such as count, summarize, etc...
+
+Joining tables to themselves
+-some tables contain hierarchical comparisons within the table, such that observations can be linked to each other for any given variable. For example, the LEGO dataset, "themes" has a parent_id column that shows nested (hierarchical) themes. The theme "Technic" (parent_id = NA) is the broadest theme. It contains 4 daughter themes (Arctic Technic, Competition, Expert Builder, and Model) each with a parent_id value of 1. Another nested theme exists within "Model" which has 5 daughter/nested themes (Airport, Construction, Farm, Fire, and harbor). These observations have a parent_id value of 5, because they are the linked to the observation "Model", which has a value of 5 in its id column.
+-If you wish to join a table to its, it works similar to joining different tables. Instead of specifying different tables, you specify the original table in the joining verb. This works for inner, right, and left joins.
+
+The full_join verb
+-like the other join verbs, full_join can join 2 or more tables. However, when using full_join, you keep all observations from BOTH sets
+
+The semi_join verb
+-up until now, every join verb is classified as a mutate verb, where columns are combined between the two tables that were not in the original table.
+-semi_join is the first filtering verb rather than a mutate verb. These filtering verbs still compare values between two or more tables. However, these verbs do not alter the columns found in the original tables.
+-semi_join keeps the observations in table 1 that are found in table 2 (column specified by "by = " statement, ). Semi_join will return those observations, but still keep the original columns of table 1, without adding any data from table 2.
+
+The anti_join verb
+-anti_join is very similar to semi_join, in that it is also a filtering verb. Anti_join returns the values of table 1, that are NOT found in table 2 (specified with the "by = " statement). Again, the original columns of table 1 are kept, but the values of table 2 are NOT added.
+
+the bind_rows verb
+-so far, tables have been combined based on the columns that represent different variables. 
+-instead of joining by identical columns like that in the join verbs, you can "stack" tables using the bind_rows verb. This works by specifing the table that will be bound to the bottom of the orignal table using the pipe syntax
+
+
+------Using Pivots
+-pivot_longer: allows you to lengthen the dataset, increasing the number of rows by decreasing the number of columns. This works by assing the col name (which is the variable name)
+```{r}
+iris %>%
+  select(Species, Sepal.Width)%>%
+  pivot_longer(!Species, names_to = "key", values_to = "value")%>%
+  group_by(Species)%>%
+  summarize(avg = mean(value), stdev = sd(value))
+
+
+  
+```
+

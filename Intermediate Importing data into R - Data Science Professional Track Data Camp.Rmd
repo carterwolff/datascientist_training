@@ -1,0 +1,466 @@
+---
+title: "Immediate Importing Data in R"
+author: "Carter Wolff"
+date: "2023-07-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---Chapter 1: Importing data from databases - pt 1
+Connect to a database
+-A relational database contains multiple data sets within a bases
+  -These data sets are usually linked together via id values that are stored as a column
+-The database is paired with a Database Management System. These systems update information across the database 
+  -Open source exampls of DBMS include MySQL, PostgreSQL, SQLite
+-Most of these database management systems work in SQL
+-To work with these databases in R, you need the following packages for the respective DBMS
+    -MySQL: RMySQL
+    -PostgresSQL: RPostgresSQL
+    -Oracle Database: ROracle
+-In all DBMS cases, you also need the pacakge, DBI which acts as a interface for the implementation of the different DBMS
+  -installing the specific DBMS package will also install DBI. And loading DBI will load the DBMS with it, so install.packages("DBI") and library(RMySQL) are not required
+-use dbConnect to connect to a database. it takes the following arguments
+  -dbConnect(RMySQL::MySQL(), dbname = , host = , port = , user = , password = ,)
+    -everything after the first argument is a string that gives the information about the connection the the database
+    -the first argument constructs the SQL driver you are connecting to
+  -The result of dbConnect is a dbConnect object which is passed to all functions that you use to interact with that database
+
+-After connecting to a database, you can use the dbListTables(con) function
+  -this function returns a character vector of all the tabels available in the database
+-To read in a table, use dbReadTable(con, "table name"). The result is a dataframe()
+-It is common to disconnect your database when you finish your task
+  -to do this, use dbDisconnect(con)
+-you can import all tables from the database as well using the lapply function
+  -in this scenario use lapply("vector of table names", dbReadTable, conn = con)
+    -this will import all the tables into a list with each table as a different list elemenet
+-the other option to importing is to use repeatedly use dbReadTable commands, which will store the tables as a dataframe rather than a list of data frames
+```{r}
+library(DBI)
+#Recall that DBI also loads in the respective DBMS
+
+# Edit dbConnect() call
+con <- dbConnect(RMySQL::MySQL(), 
+                 dbname = "tweater", 
+                 host = "courses.csrrinzqubik.us-east-1.rds.amazonaws.com", 
+                 port = 3306,
+                 user = "student",
+                 password = "datacamp")
+
+# Build a vector of table names: tables
+table_names <- dbListTables(con)
+
+# Display structure of tables
+str(table_names)
+
+# Import the users table from tweater: users
+users <- dbReadTable(con, "users")
+
+# Print users
+users
+
+#store all tables in database as a list
+tables <- lapply(table_names, dbReadTable, conn = con)
+
+tables
+```
+
+
+---Chapter 2: Importing data from databases - pt 2
+SQL Queries from Inside R
+-Selective importing using SQL queries is a way to select only certain amounts of data from a data set within a database
+  -This process combines R and SQL within R, all handled through the DBI commands
+    -essentially, you tell R that you are writing an SQL query within the different DBI commands
+  -One such function is dbGetQuery(con, "SQL QUERY TO GET DATA")
+  -Here is an example that is used to explain common SQL commands: dbGetQuery(con, "SELECT name FROM employees WHERE started_at > '2012-09-01'")
+    -SELECT: what data are you selecting (i.e., the name column)
+      -To select all columns from a database, use * instead of specific column names. i.e., "SELECT * FROM employees..."
+    -FROM: where is that column located (i.e., in the employees table)
+    -WHERE: select the names that started after 2012-09-01 (similar to filter())
+    -INNER JOIN: works like dplyr. Specify the tables to join with and the condition to sort the data, which should be a key found in both tables   
+
+```{r}
+library(DBI)
+con <- dbConnect(RMySQL::MySQL(),
+                 dbname = "tweater",
+                 host = "courses.csrrinzqubik.us-east-1.rds.amazonaws.com",
+                 port = 3306,
+                 user = "student",
+                 password = "datacamp")
+
+# Import tweat_id column of comments where user_id is 1: elisabeth
+elisabeth <- dbGetQuery(con, "SELECT tweat_id FROM comments WHERE user_id = 1")
+
+# Print elisabeth
+elisabeth
+
+# Import post column of tweats where date is higher than '2015-09-21': latest
+latest <- dbGetQuery(con, "SELECT post FROM tweats WHERE date > '2015-09-21'")
+
+# Print latest
+latest
+
+# Create data frame specific that selects the message column from the comments table where the tweat_id is 77 and the user_id is greater than 4
+specific <- dbGetQuery(con, "SELECT message FROM comments WHERE tweat_id = 77 AND user_id > 4")
+
+# Print specific
+specific
+
+# Create data frame short that selects id and name from users that have names less than five letters
+short <- dbGetQuery(con, "SELECT id, name FROM users WHERE CHAR_LENGTH(name) < 5")
+
+# Print short
+short
+
+#Create the data frame joined, that selects the post and message column from tweats and joins it with comments, but only from tweat id 77
+joined <- dbGetQuery(con, "SELECT post, message FROM tweats INNER JOIN comments on tweats.id = tweat_id WHERE tweat_id = 77")
+
+#print joined
+joined
+```
+
+DBI Internals
+-dbGetQuery() has three functions within DBI that is calls behind the scene
+  -dbSendQuery(): This sends your SQL query to the database
+    -while this does return the result of your query, it is not easily accessible or formated 
+  -dbFetch(): turns the results of dbSendQuery() into something human friendly, like the results seen in dbGetQuery()
+  -dbClearResult(): clears the request so that a new request can be made
+-While dbGetQuery is nice, you may opt to use the three chain commands instead for certain situations
+  -dbFetch allows you to specify a max number of values to import, which is good if you are working with overly large data sets
+  -get the result of the query record by record
+    -this can be done with a simple while loop using the function dbHasCompleted()
+      res <- dbSendQuery(con, "SELECT * FROM table name WHERE condition to meet")
+      while(!dbHasCompleted(res)){
+      chunk <- dbFetch(res, n = 1)
+      print(chunk)}
+    -This code also works because dbFetch is intuitive. If you don't clear the sendquery result, dbFetch will pick up where it left off
+
+```{r}
+# Connect to the database
+library(DBI)
+con <- dbConnect(RMySQL::MySQL(),
+                 dbname = "tweater",
+                 host = "courses.csrrinzqubik.us-east-1.rds.amazonaws.com",
+                 port = 3306,
+                 user = "student",
+                 password = "datacamp")
+
+# Send query to the database
+res <- dbSendQuery(con, "SELECT * FROM comments WHERE user_id > 4")
+
+# Use dbFetch() twice - first call take only 2 observations. Second call take all observations
+# notice for the second call, you don't repeat the previous observations, since you didnt clear results before 
+# fetch picks up where it left off
+dbFetch(res, n = 2)
+dbFetch(res)
+
+# Clear res
+dbClearResult(res)
+
+# Create the data frame long_tweats that selects posts from tweets longer than 40 characters
+long_tweats <- dbGetQuery(con, "SELECT post, date FROM tweats WHERE CHAR_LENGTH(post) > 40")
+
+# Print long_tweats
+print(long_tweats)
+
+# Disconnect from the database
+dbDisconnect(con)
+```
+
+---Chapter 3: Importing data from the web - pt 1
+HTTP - HyperText Transfer Protocol and HTTPS - HyperText Transfer Protocol Secure
+-HTTP is the language that dictates exchange of information between computers (client and server)
+-in R, you can download a csv data set directly from the web by pasting the full URL inside the read.csv() function
+  -this requires http:// to be specified so are can see that it is a URL
+  -for websites that require a secure link, this changes to https:// which newer versions of R also support
+
+```{r}
+# Load the readr package
+library(readr)
+
+# Import the csv file: pools
+url_csv <- "http://s3.amazonaws.com/assets.datacamp.com/production/course_1478/datasets/swimming_pools.csv"
+pools <- read_csv(url_csv)
+
+# Import the txt file: potatoes
+url_delim <- "http://s3.amazonaws.com/assets.datacamp.com/production/course_1478/datasets/potatoes.txt"
+potatoes <- read_tsv(url_delim)
+
+# Print pools and potatoes
+pools 
+potatoes
+
+# https URL to the swimming_pools csv file.
+url_csv <- "https://s3.amazonaws.com/assets.datacamp.com/production/course_1478/datasets/swimming_pools.csv"
+
+# Import the file using read.csv(): pools1
+pools1 <- read.csv(url_csv)
+
+# Import the file using read_csv(): pools2
+pools2 <- read_csv(url_csv)
+
+# Print the structure of pools1 and pools2 - read.csv() and read_csv() return the same result in different formats
+str(pools1)
+str(pools2)
+```
+
+Downloading files from the web
+-download.file() will download files from a url into a directory that you specify
+-since read_excel does not work with urls, this is a workaround.
+-on the other hand, read.excel from gdata package does accept urls
+
+```{r}
+# Load the readxl and gdata package - This code in this chunk not executable, but is left in to see the syntax.
+# Another example below shows how download.file() can work for RData files
+library(readxl)
+library(gdata)
+
+
+# Specification of url: url_xls
+url_xls <- "http://s3.amazonaws.com/assets.datacamp.com/production/course_1478/datasets/latitude.xls"
+
+# Import the .xls file with gdata: excel_gdata
+excel_gdata <- read.xls("http://s3.amazonaws.com/assets.datacamp.com/production/course_1478/datasets/latitude.xls")
+
+# Download file behind URL, name it local_latitude.xls
+local_latitude.xls <- download.file(url_xls, "local_latitude.xls")
+
+# Import the local .xls file with readxl: excel_readxl
+excel_readxl <- read_excel("local_latitude.xls")
+
+```
+```{r}
+# https URL to the wine RData file.
+url_rdata <- "https://s3.amazonaws.com/assets.datacamp.com/production/course_1478/datasets/wine.RData"
+
+# Download the wine file to your working directory
+download.file(url_rdata, destfile = "wine_local.RData")
+
+# Load the wine data into your workspace using load()
+load("wine_local.RData")
+
+# Print out the summary of the wine data
+summary(wine)
+```
+
+HTTR
+-All of the file downloads and url data read ins to this point include sending a request to specified url. This is commonly known as a GET request
+-The httr package in R has a GET() function that returns a response object with status code, content-type and the content of the request
+  -pair this with the content() function to exctract the content from the GET request
+    -you can also specify how the content should be extracted with the as = argument
+
+```{r}
+# Load the httr package
+library(httr)
+
+# Get the url, save response to resp
+url <- "http://www.example.com/"
+resp <- GET(url)
+
+# Print resp
+resp
+
+# Get the raw content of resp: raw_content
+raw_content <- content(resp, as = "raw")
+
+# Print the head of raw_content
+head(raw_content)
+
+##Demonstration of how R can guess the format of the content
+
+# Get the url
+url <- "http://www.omdbapi.com/?apikey=72bc447a&t=Annie+Hall&y=&plot=short&r=json"
+resp_omd <- GET(url)
+
+# Print resp
+resp_omd
+
+# In the comparison below, notice how the second example is nicely formatted into a list
+# Print content of resp as text
+content(resp_omd, as = "text")
+
+# Print content of resp
+content(resp_omd)
+```
+
+
+---Chapter 4: Importing data from the web - pt 2
+APIs and JSONs
+-Web APIs provide a process for getting data from a server or adding data to the server through the GET methods specified earlier
+-for example, twitter has an API that allows you to get information on tweets from users
+-HTML code on its own is messy and contains several lines that require sifting through
+-on the other hand, a JSON (JavaScript Object Notation) is a file that contains organized information about the html code
+  -For example, you can get movie information from the omdb api and the JSON file will have information on title, actors, genre, etc...
+  -The jsonlite package in R allows you to work with json files
+-in the jsonlite package, fromJSON("url to api") lets you download all the information from the given link and convert it into a list
+
+
+
+```{r}
+library(jsonlite)
+
+# wine_json is a JSON
+wine_json <- '{"name":"Chateau Migraine", "year":1997, "alcohol_pct":12.4, "color":"red", "awarded":false}'
+
+# Convert wine_json into a list: wine
+wine <- fromJSON(wine_json)
+
+# Print structure of wine to show it as a list
+str(wine)
+
+#using fromJSON to pull web information
+# Definition of quandl_url
+quandl_url <- "https://www.quandl.com/api/v3/datasets/WIKI/FB/data.json?auth_token=i83asDsiWUUyfoypkgMz"
+
+# Import Quandl data: quandl_data
+quandl_data <- fromJSON(quandl_url)
+
+# Print structure of quandl_data
+str(quandl_data)
+
+#Another example of pulling information from web sources and extracting json
+# Definition of the URLs
+url_sw4 <- "http://www.omdbapi.com/?apikey=72bc447a&i=tt0076759&r=json"
+url_sw3 <- "http://www.omdbapi.com/?apikey=72bc447a&i=tt0121766&r=json"
+
+# Import two URLs with fromJSON(): sw4 and sw3
+sw4 <- fromJSON(url_sw4)
+sw3 <- fromJSON(url_sw3)
+
+# Print out the Title element of both lists
+sw4$Title
+sw3$Title
+
+# Is the release year of sw4 later than sw3?
+sw4$Year > sw3$Year
+```
+JSON objects and JSON arrays
+-JSON objects are unordered collection of name:value pairs
+  -the name is a string and the value is any data type (string, numeric, boolean, JSON object, JSON array, etc)
+-The format for JSON in R is similar to that of a Python Dictionary
+-JSON arrays are ordered vectors of different data types
+  -converting a numerical JSON array to R using fromJSON() gives a numerical vector in R
+  -unlike R, JSON can have different datatypes within the same area.
+  -meaning if you try to convert a JSON array with numeric and character values to R, all the values will be coerced to chr
+-Other JSON functions
+  -instead of fromJSON(), you can also convert data to JSON with the toJSON() function. There are two outputs possible with this, mini and pretty
+    -mini: outputs all the information in a horizontal line (i.e., on one line of code)
+    -pretty: uses indentation and line breaks to organize the different categories within the JSON object
+  -to prettify a data set while converting it to a JSON, use the argument pretty = TRUE (its FALSE by default, meaning the mini output is default)
+  -if you already have a JSON string, use prettify() or minify() respectively
+
+
+```{r}
+### Different format conversions of jsons
+# Convert json array to R vector
+json1 <- '[1, 2, 3, 4, 5, 6]'
+fromJSON(json1)
+
+# Convert  json object to a list lists 
+json2 <- '{"a": [1, 2, 3], "b": [4, 5, 6]}'
+fromJSON(json2)
+
+# Convert the json array into a matrix
+json3 <- '[[1, 2], [3, 4]]'
+fromJSON(json3)
+
+# Convert the json object into a dataframe
+json4 <- '[{"a": 1, "b": 2}, {"a": 3, "b": 4}, {"a": 5, "b": 6}]'
+fromJSON(json4)
+
+###functions other than fromJSON
+# URL pointing to the .csv file
+url_csv <- "http://s3.amazonaws.com/assets.datacamp.com/production/course_1478/datasets/water.csv"
+
+# Import the .csv file located at url_csv
+water <- read.csv(url_csv)
+
+# Convert the data file according TO JSON
+water_json <- toJSON(water)
+
+# Print out water_json
+water_json
+
+### Mini and Pretty jsons
+# Convert mtcars to a pretty JSON: pretty_json
+pretty_json <- toJSON(mtcars, pretty = TRUE)
+
+# Print pretty_json
+pretty_json
+
+# Minify pretty_json: mini_json
+mini_json <- minify(pretty_json)
+
+# Print mini_json
+mini_json
+```
+
+---Chapter 5: Importing Data from Statistical Software Packages
+haven
+-all of the different statistical packages (SAS, SPSS, etc) produce their own file types, but there are two packages in R to help deal with these
+  -the first is haven, which is more streamlined than foreign and is constantly updated
+  -the second is foreign, which was written by the R Core Team, but isnt regularly updated
+    -it does support more formats than haven though
+-in haven, the process works similar to other read in functions and can handle SAS, STATA, and SPSS file types
+  -read_sas() reads in a .sas7bdat file and just like read_excel would. It only requires the path to the file
+    -it reads the data in as a dataframe and includes any attributes that may have been labeled from SAS
+  -read_stata() or read_dta(): They do the same thing, which reads in a .dta file
+    -these read in a file, but unlike other importing processes, labelled vectors are changed to numbers. An extra step is needed to retrieve the strings as you would expect them for categorical variables.
+      -after reading in the file, call as_factor (not as.character from base R) on the column of interest and wrap it with as.character to convert it back to a string
+        data$labelname <- as.character(as_factor(data$labelname))
+  -read_spss() will load in .por or .sav files
+  
+```{r}
+library(haven)
+
+# Import sales.sas7bdat: sales --- Commented out becuase the file is not in the directory
+#sales <- read_sas("sales.sas7bdat")
+
+# Display the structure of sales
+#str(sales)
+
+# Import the data from the URL: sugar
+sugar <- read_dta("http://assets.datacamp.com/production/course_1478/datasets/trade.dta")
+
+# Structure of sugar
+str(sugar)
+
+# Convert values in Date column to dates
+sugar$Date <- as.Date(as_factor(sugar$Date))
+
+# Structure of sugar again
+str(sugar)
+
+# Import person.sav: traits --- Also commented out because the file is not in the working directory
+#traits <- read_sav("person.sav")
+
+# Summarize traits
+#summary(traits)
+
+# Print out a subset
+#subset(traits, subset = c(Extroversion > 40 & Agreeableness > 40))
+
+# Import SPSS data from the URL: work
+work <- read_spss("http://s3.amazonaws.com/assets.datacamp.com/production/course_1478/datasets/employee.sav")
+
+# Display summary of work$GENDER
+summary(work$GENDER)
+
+# Convert work$GENDER to a factor
+work$GENDER <- as_factor(work$GENDER)
+
+# Display summary of work$GENDER again
+summary(work$GENDER)
+```
+Foriegn package
+-cannot import singular SAS files. Rather, they import libraries,
+-STATA:
+  -foreign reads in STATA files with read.dta("file path", convert.factors = , convert.dates = , missing.type = )
+    -convert.factors and convert.dates are true by default
+    -missing.type = FALSE by default. if FALSE, missing types will be listed as NAs; if TRUE the information on the missing values is listed as an attribute in the df
+-SPSS uses read.spss("file path", use.value.labels = TRUE, to.data.frame = FALSE)
+    -use.value.labels converts spss labels into R factors
+    -to.data.frame results in a list or data frame depending on which is specified
+

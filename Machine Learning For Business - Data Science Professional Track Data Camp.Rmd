@@ -1,0 +1,37 @@
+---
+title: "Machine Learning for Business"
+author: "Carter Wolff"
+date: "2023-07-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+---Chapter 1: Machine Learning and data use cases
+Data hierarchy of needs
+1. Collection - organization needs to effectively collect data
+2. Storage - organization needs to properly store data
+3. Cleaning - Preparing data for analysis
+4. Analysis - understand trends and distributions of data
+5. Prototype and Testing ML models
+6. ML in productions
+-This course focuses on the last two parts of this course
+
+
+---Chapter 2: Machine learning types
+Prediction vs inference dilemma
+-inference models are designed to determine the main indicators of your desired response
+  -these include interpretable insights
+-Prediction models
+  -the prediction is the main goal. And the model needs to produce the best prediction, regardless of complexity or interpretability
+
+Inference Models - Answering "why" questions
+-optimized for performance and interpretability
+
+Supervised Learning Models
+-
+---Chapter 3: Business requirements and model design
+
+
+---Chapter 4: Managing machine learning projects

@@ -1,0 +1,122 @@
+---
+title: "Cleaning Data in R - Statistics Datacamp"
+author: "Carter Wolff"
+date: "2023-06-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(assertive)
+library(dplyr)
+library(forcats)
+```
+
+
+Clean data is one of the most important steps in Data Science. Dirty data can affect all steps of your data pipeline in different ways. Thus, getting clean data to analyze is important for accurate interpretations of data analysis.
+
+---Constraints with Data
+
+Data Type Constraints
+-data exists in all types, such as text and numeric formats. It is vital that R recognizes variables in your dataset as the correct type.
+-one way to check the type of data you have for each variable individually is with the is._____ function (i.e., is.numeric). These functions return TRUE/FALSE if the data matches the function you called.
+-assert_is_* (): in addition, you can safeguard your analysis by telling R to return an error if the variable types do not match your intended type for the output. assert_is_numeric(variable name) will return an error if the variable you specify is not of type, numeric. This requires the assertive package
+-all data types have an is. and assert_is_ function
+-class(): class(variable) will return the data type of the variable
+-as.numeric(): converts data type into type numeric. There are as. functions for all data types as well.
+
+Range Constraints
+-most data has an appropriate range that values fall in. Thus, if we data outside of the range, we know that data point is invalid.
+-histograms are quick and easy ways to evaluate if data falls outside of an appropriate range.
+-you can also use assert_all_are_in_closed_range(variable, lower = , upper = ) to check if all data is within the specified lower and upper values. This also requires the assertive package
+-if values are out of range, you can:
+  -remove the range value: filter() in dplyr
+  -replace the range value: replace(variable column, condition for replacement, replacement value) in dplyr. Your replacement value can be NA or a value within the         range, such as the range limit
+
+Uniqueness constraints
+-used to eliminate/alter duplicate data points
+-R contains a built in function to detect duplicates, called duplicate(). Dplyr contains a more specific function, distinct() that can be used to drop full or partial duplicates
+-Duplicates can either be removed or combined by taking a summary statistic (i.e., mean) if there are partial duplicates
+
+Membership Constraints (appropriate values in variables)
+Factors
+-factors, such as categorical variables, contain distinct levels. A value can not exists outside of the levels for each factor. Thus, review data in these factor variables is important for data cleaning
+-the join functions from dplyr are ways to evaluate a factor's value, assuming that you have a second data set to compare the levels too.
+-remember that with join functions, the first argument is the data you want to join with the initially specified dataset in the pipe. The by = argument specifys the condition for joining. Semi_join() removes data that does not meet the condition. Anti_join() keeps data that does not meet the condition
+    orig_data %>% semi_join(new_data, by = join condition)
+    
+Categorical variables
+-combining strings that belong to the same level (i.e., "lizard" and "Lizard" or "lizard " and "lizard")
+  -str_to_lower() and str_to_upper() convert all data in a column to their respective case. This can be called in the mutate function
+  -str_trim() removes white space from the beginning and ending of the string, but not the middle if the string
+-collapsing categorical variables
+  -from the forcats package, you can use fct_collapse to collapse factors to a single defined factor. This requires a condition (i.e., a vector of level names) to        specify the levels to collapse
+    - data %>% mutate(col_name_collapsed = fct_collapse(col_name, other_levels = c("a", "b", "c"))). This command will collapse levels "a", "b", and "c" to                 "other_levels"
+    
+Cleaning Text Data
+-text data is usually unstructured meaning that their are a number of formatting issues that can occur. 
+-one approach to handling this data is to detect defined characters in the string, such as "-". This requires the str_detect function in dplyr. An example of this is     str_detect(data$col, "-"). This will return a logical vector where TRUE values are returned if a - exists in the string. it can be combined with filter() or mutate     functions to clean these characters out of the dataset. For example:
+    data %>% mutate(new_col = str_replace_all(col, "-", " ") This command will replace all "-" with a " " in the col column
+    data$col %>% str_remove_all("-") %>% str_remove_all(" ") will remove all hyphens and then remove all spaces from the column col
+-you can find all invalid text values in many ways. The common approach is to use "regular expressions" to search for patterns in texts. For example, if your text        column contains a list of emails, you can filter the column by looking for "@" since all valid emails must contain an @ symbol. Regular expressions exist for all type   of characters. using the str_detect function requires a fixed argument before specifying the characters. For example: str_detect(email_data, fixed("@"))
+
+---Uniformity
+When continuous data points have different units or different formats, such as celsius versus fahrenheit for temperature
+-the ifelse statement, inside a mutate() function is an excellent tool to convert values that are in different units. An example of a conversion from fahrenheit to celsius in a temperature column is shown below. In the example, the data in the temp column is converted if the value is above 50 (because 50 deg C is not an appropriate value). If not, the value for temp is returned. These values are stored in a new column, temp_c
+
+tempdata %>% mutate(temp_c = ifelse(temp, temp > 50, temp - 32 * 5 / 9, temp)).
+
+Cross field validation to find dirty data
+-check if one value makes sense based on the other values in your data set.
+
+Completeness
+-most common part of data cleaning, commonly represented by NA or nan
+-the is.na() will return logical value for every value in the data set (TRUE = NA). You can wrap this in a sum() function to find the total number of values that are NA
+-the visdat package contains functions such as vis_miss() that will plot all the missing and present data in black and grey bars respectively (see example below)
+-you can look for trends in missing data using the pipe method to organize data by desired values. Summary statistics are helpful here to see if there are correlations with other variables. 
+-data values can be missing in three different ways
+  -Missing Completely at Random (MCAR): No systematic relationship between missing data and other values
+  -Missing at Random (MAR): Misleading name. A relationship exists between the missing values of one variable and the observed values of another variable. An example    of this would be if ozone values are missing when temperatures are high (sensor may not function at extreme temperatures)
+  -Missing Not at Random (MNAR): A relationship exists between missing values and unobserved values in the data set (i.e., missing high temperatures in a temp column)
+      -no way to determine this from the data alone (unobserved)
+-Missing values can be handled in different ways:
+  -Remove missing values
+  -Replace missing values with a summary statistic (mean/median)
+  -Replace missing values with an estimated value based on an algorithm (i.e., machine learning)
+
+
+```{r}
+library(visdat)
+
+#plot to show missing values by variable. Black bars indicate missing values
+vis_miss(airquality)
+
+#plot that shows missing values after airquality is sorted by ozone. NA ozone values are clustered
+sorted_airquality <- airquality %>% arrange(Temp)
+vis_miss(sorted_airquality)
+
+#Summary statistics on other variables for missing and present data - Calculate the mean of wind, solar, temp when Ozone is present or missing
+airquality %>%
+  #create a logical factor to check for missing ozone values
+  mutate(miss_ozone = is.na(Ozone)) %>%
+  #group data into missing vs present Ozone values
+  group_by(miss_ozone) %>%
+  #calculate mean of other values. Remove na values of other variables for mean calculation
+  summarise(across(everything(), mean, na.rm = TRUE))
+```
+
+Comparing Strings
+-minimum edit distance: the minimum number of edits for string1 to match string2. Dogs -> dog, hog -> dog, odg -> dog, and og -> dog all have a minimum edit distance of 1. But baboon -> to typhoon requires four separate edits to match, so the minimum edit distance is 4.
+  -The above example is called the Damerau-Levenshtein message. There are others that put emphasis on different factors. For example, the Levenshtein method only        considers substituion, insertion, and deletion, but not transposition of two characters. Each method has advantages and disadvantages
+-to calculate distance in R, you can use the stringdist() function from the stringdist package. In this function, you need to specify a method such as 
+stringdist("string1", "string2", method = "dl")
+-with string values, you can join to dataframes together. This is beneficial if you have dirty data where a string may be represented in different ways (i.e., typos)
+  -the fuzzyjoin package uses the stringdist estimated above to do this join. One function from this package is stringdist_left_join to do a left join. You can specify     the stringdist method, the max string distance and more
+  
+Record Linkage
+-If joining strings does not work (i.e., duplicates in the two tables being joined), record linkage is an appropriate method. Record linkage compares values of two datasets to generate likeness scores. You can join these tables based on a threshold of likeness scores. The reclin package in R allows you to do so.
+-Record linkage compares every row from table A to every row from table B. If your data set is large, this approach is cumbersome. Thus, you can set a blocking variable to minimize the comparisons R makes. In blocking, R will only compares values if they share an identical blocking variable. For example, to make a comparison of cities in table A and table B, you can set a blocking variable as State. That way, R will only compare cities if they are in the same state. 
+  -pair_blocking(tableA, table B, blocking_var = "variable name")

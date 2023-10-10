@@ -1,0 +1,358 @@
+---
+title: "Joining Data in SQL"
+author: "Carter Wolff"
+date: "2023-09-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---Chapter 1: Introducing Inner Joins
+Inner Joins
+  -It is common to start a SQL JOIN by specifying the JOIN line before the SELECT line. The SELECT line still appears as the initial line of code followed by the FROM      line
+  -fields within a table are named with a period notation, such that tablename.field name
+  -The ON keyword defines the key that SQL uses to join two tables
+    -i.e.:
+      FROM table1
+      INNER JOIN table 2
+      ON table1.fieldname = table2.fieldname
+    -When two tables contain fields of the same name, the period notation defined earlier is necessary in the SELECT line of the query. 
+      -This is also why it is common to write the SELECT line of the query last
+  -When joining, the AS command can be used to give alias names for each table, similarly to how it is used in the SELECT line of the query, such that
+    FROM table1_name AS newtablename
+    INNER JOIN table2_name AS newtablename
+    -Since SELECT is executed after the FROM and JOIN statements, the new nomenclature needs to be used in the SELECT line
+  -The USING keyword is a shorthand way to define the key between tables as long as the column names are identical between tables
+```{sql connection=}
+-- Select all columns from cities
+SELECT *
+FROM cities;
+-- Inner join to countries
+INNER JOIN countries
+-- Match on country codes
+ON cities.country_code = countries.code;
+
+-- Select name fields (with alias) and region 
+SELECT cities.name AS city, countries.name AS country, region 
+FROM cities
+INNER JOIN countries
+ON cities.country_code = countries.code;
+
+-- Select fields with aliases
+SELECT c.code AS country_code, name, year, inflation_rate
+FROM countries AS c
+-- Join to economies (alias e)
+INNER JOIN economies as e
+-- Match on code field using table aliases
+ON c.code = e.code;
+
+SELECT c.name AS country, l.name AS language, official
+FROM countries AS c
+INNER JOIN languages AS l
+-- Match using the code column
+USING(code);
+```
+
+Type of relationships between tables
+-One-to-many relationship
+  -one record from a table can be associated with multiple records of a different table
+    i.e., one author in table 1 can have multiple books found in table 2
+-One-to-one relationship
+  -one record from table 1 is only associated with a single record from another table
+    -i.e., finger from table 1 associated with one fingerprint in table 2
+-Many-to-many relationship
+  -any record from table 1 can have multiple associations with a second table AND vice versa
+    -i.e., there are multiple languages present in each country AND each language can be present in multiple countries. So if table 1 contains countries while table 2    contains languages, the relationship between table 1 and table 2 would be considered a many to many relationship
+
+Multiple Joins
+-It is possible to chain multiple joins together within one query. This is done by using a second INNER JOIN and ON line that follows the initial INNER JOIN and ON statement
+-when conducting multiple jooins, aliasing is a powerful tool to organize data and make queries easy to read
+  -when defining the key for joins, you should always compare each new table to the left most table (the one usually specified in the FROM statement) such as:
+    SELECT *
+    FROM lefttable
+    INNER JOIN righttable
+    ON lefttable.id = righttable.id
+    INNER JOIN thirdtable
+    ON lefttable.id = thirdtable.id
+  -It is possible to join the third table based on a key from the second table (righttable in the above example). To do so, specify the second table name in the second ON statemetn
+-It is also possible to specify two or more key fields within a single ON statement. To do this, use the AND keyword inbetweem the keys you wish to join. For example:
+  SELECT *
+  FROM table1
+  INNER JOIN table2 
+  ON table1.key1 = table2.key2 AND table1.key2 = table2.key2
+
+---Chapter 2: Outer Joins, Cross Joins, and Self Joins
+Left Join
+-Left joins return ALL records in the left table (in the FROM statement) and ONLY records in the right table that match records in the right join
+-After the join, if there is no match in the right table field, the new table will show a null
+-The syntax between INNER JOIN and LEFT JOIN is similar with the only change swapping INNER with LEFT
+
+RIGHT JOIN
+-the opposite to LEFT JOIN. ALL records from the right table are retained while only records from the left table that match the right table are retained
+
+Both LEFT JOIN and RIGHT JOIN can be written as LEFT OUTER JOIN and RIGHT OUTER JOIN Respectively
+-RIGHT JOIN is less commonly used compared to LEFT JOIN. Mainly because RIGHT JOINS usually can be written as LEFT JOINS and it is more intuitive, given we read left to right
+
+```{sql connection=}
+SELECT 
+	c1.name AS city, 
+    code, 
+    c2.name AS country,
+    region, 
+    city_proper_pop
+FROM cities AS c1
+-- Join right table (with alias)
+LEFT JOIN countries as c2
+ON c1.country_code = c2.code
+ORDER BY code DESC;
+
+-- Select region, and average gdp_percapita as avg_gdp
+SELECT region, AVG(gdp_percapita) AS avg_gdp 
+FROM countries AS c
+LEFT JOIN economies AS e
+USING(code)
+WHERE year = 2010
+-- Group by region
+GROUP BY region
+-- Order by descending avg_gdp
+ORDER BY avg_gdp DESC
+-- Return only first 10 records
+LIMIT 10;
+
+```
+
+FULL JOINS
+-FULL JOINS are the last of the three types of OUTER JOINS. In FULL JOINS, all records are returned from BOTH tables, regardless if they have a match with the other table
+-In FULL JOIN, nulls will appear in fields from both tables
+-The syntax for FULL JOINS are the same as INNER, LEFT, and RIGHT JOIN. Again, FULL OUTER JOIN is an acceptable alternative to FULL JOIN
+```{sql connection=}
+SELECT 
+	c1.name AS country, 
+    region, 
+    l.name AS language,
+	basic_unit, 
+    frac_unit
+FROM countries as c1 
+-- Full join with languages (alias as l)
+FULL JOIN languages AS l 
+USING(code)
+-- Full join with currencies (alias as c2)
+FULL JOIN currencies AS c2
+USING(code)
+--Filter for Melanesia and Micronesia 
+WHERE region LIKE 'M%esia';
+
+```
+
+CROSS JOIN
+-cross joins contain all possibilities of the two tables that are being joined. Each possible combination is given a record in the new table
+-the syntax for cross joins does not include ON or USING keywords, since we are including all combinations from each table
+  -thus, it is valuable to have well thought out SELECT statements to reduce clutter in the query request. Usually, only a few fields are selected for
+```{sql connection=}
+SELECT c.name AS country, l.name AS language
+FROM countries AS c        
+-- Perform a cross join to languages (alias as l)
+CROSS JOIN languages AS l
+-- Filter for countries, Pakistan and India
+WHERE c.code in ('PAK','IND')
+	AND l.code in ('PAK','IND');
+```
+
+SELF JOINS
+-self joins are joins where a table is joined with itself
+  -this is used to compare parts of the table to other parts of the table
+-Self joins typically don't have dedicated syntax. Nor do we directly write a self join in the query
+-Instead, we need to use aliasing to tell SQL to join with itself. This is typically accompanied with INNER JOIN
+  -In this example, records of a table will be matched with themselves in the new table. Thus we have to filter for results that are not equal to each other between fields. This requires the <> operator used inside the ON command
+  
+  SELECT t1.fieldname AS t1, t2.fieldname AS t2
+  FROM table AS t1
+  INNER JOIN table AS t2
+  ON t1.fieldname = t2.fieldname
+  AND t1.fieldname <> t2.fieldname
+```{sql connection=}
+--self join practice to compare population size within a country between 2010 and 2015
+SELECT 
+	p1.country_code, 
+    p1.size AS size2010, 
+    p2.size AS size2015
+--SELF JOIN populations on itself by country code
+FROM populations AS p1
+INNER JOIN populations AS p2
+ON p1.country_code = p2.country_code
+--filter for popution size in the year 2010
+WHERE p1.year = 2010
+-- Filter such that p1.year is always five years before p2.year (i.e., pop size 2 = 2015)
+AND p1.year = (p2.year - 5)
+```
+
+---Chapter 3: Set Theory for SQL Joins
+Set operations to join data instead of using JOINS
+-Set operations stack tables on top of each other rather than join left to right. Thus they are combined by records, not by fields
+  -For this reason, set operations do no require a field to join on. 
+  -There are three main set operations to join data. UNION, INTERSECT, EXCEPT
+-UNION takes two tables as input and returns all records from both tables. If two records are identical, UNION only returns 1 record
+  -If you wish to include duplicate records, you can use UNION ALL to keep duplicates
+  -The syntax for UNIONS is as follows. The same syntax is true for UNION ALL (just replace UNION with UNION ALL)
+    SELECT table1fields
+    FROM table1
+    UNION
+    SELECT table2fields
+    FROM table2;
+-When stacking tables, the data type must be the same. You cannot stack a character field from table 2 onto a numeric field from table 1 for example
+-When aliasing UNION operations, the SELECT command for the first table (the first SELECT line in the query) will apply to both tables upon stacking
+-When writing set queries, it is helpful to write the set commands first, followed by the SELECT commands
+```{sql connection=}
+--Using SET operations to stack two tables, economies2015 and economies 2019
+-- Select all fields from economies2015
+SELECT *
+FROM economies2015   
+-- Set operation
+UNION
+-- Select all fields from economies2019
+SELECT *
+FROM economies2019
+ORDER BY code, year;
+```
+
+INTERSECT OPERATION
+-INTERSECT also takes two tables as inputs and returns a table that includes all records that match between the two tables
+-The syntax for INTERSECT is the same as UNION, with the exception that INTERSECT is used instead of UNION
+-INNER JOIN between two tables with identical field names is very similar to INTERSECT. HOWEVER, INTERSECT will not return duplicats, while INNER JOIN can if there are multiple of the same key in 1 or more tables
+-INTERSECT evaluates the comparison between table 1 and table 2 from the perspective of the entire record. 
+  -This means, that ALL fields passed in the SELECT command from table 1 must match with ALL fields passed in the command for table 2
+```{sql connection=}
+-- Return all cities with the same name as a country
+SELECT name
+FROM cities
+INTERSECT
+SELECT name
+FROM countries
+```
+
+EXCEPT
+-The EXCEPT operation only retains records in the left (first) table that are not present in the right (second) table
+  -Again, the ENTIRE record must match in the comparison between table 1 and table 2. This is different compared to JOINS that have a defined key
+```{sql connection=}
+-- Return all cities that DO NOT have the same name as a country
+SELECT name
+FROM cities
+EXCEPT
+SELECT name
+FROM countries
+ORDER BY name;
+```
+  
+---Chapter 4 Subqueries
+Subquerying with semi joins and anti joins
+-All joins and set operations to this point have been additive. They add information to the original (left) table
+-on the other hand, we can include joins that choose records in a first (left) table that meet the conditions of a second (right) table
+  -This is known as SEMI JOIN and the result is a left table that only includes records that met the condition within the right table
+    -This operation is similar to the WHERE clause, but on a much larger scale.
+-There is not a direct keyword for SEMI JOIN like we have seen before. A workaround to create a semi join is known as a subquery or nested query
+  -A subquery, as the name suggests is a second query inside the original query
+-Semi Join with Subquery
+
+  SELECT president, country, continent
+  FROM presidents
+  WHERE country IN (SELECT country
+                    FROM states
+                    WHERE indep_year < 1800)
+  
+  -In the code above, the original WHERE clause is used to as a filter, like seen before. The semi join comes into play because we are using a second table, states as the condition that needs to be met. In this case, we are looking for presidents whose independence year occured before 1800. 
+  
+-Anti Join with subquery
+  -For anti join, the syntax is similar to that of semi join. The only difference is in the initial WHERE clause. Instead of using IN, we use NOT IN
+```{sql connection=}
+-- Selecting languages that are present in the Middle East using a semi join
+SELECT DISTINCT name
+FROM languages
+-- Add syntax to use bracketed subquery below as a filter
+WHERE code IN
+    (SELECT code
+    FROM countries
+    WHERE region = 'Middle East')
+ORDER BY name;
+```
+
+Subqueries inside WHERE clauses and SELECT statements
+-It is most common to have subqueries in WHERE clauses, given that filtering data is one of the most common tasks
+-The field returned by the SELECT statement in the subquery must be of the same data type as that of the WHERE clause in the above query, since the WHERE clause needs to validate the condition against the field it is filtering
+-Subqueries inside SELECT statements operate differently. They are used to select data from other tables. This is usually done to avoid a JOIN and GROUP BY statement
+  -These subqueries typically contain a SELECT, FROM, and WHERE statement wrapped inside (), within the original SELECT statement. For Example:
+      SELECT var1, (SELECT var1, 
+                    FROM table2
+                    WHERE table1.var1 = table2.var1) AS alias_name
+      FROM table1;
+  -The subquery above pulls var 1 from table 2 as long as it matches var1 from table 1.
+  -In these examples aliasing is important to include for the subqueried field
+
+```{sql connection=}
+-- Select the countries whose life expectancy is 1.15 times greater than average. 
+SELECT *
+FROM populations
+-- Filter for only those populations where life expectancy is 1.15 times higher than average
+WHERE life_expectancy > 1.15 * 
+  (SELECT AVG(life_expectancy)
+   FROM populations
+   WHERE year = 2015) 
+    AND year = 2015;
+
+
+-- Given a list of cities (including capital and non capital cities) and a list of countries with capitals named, find the urban area population of capital cities.
+-- This requires a subquery in the initial WHERE clause to link to the second table, countries where the capital names are listed
+-- Select relevant fields from cities table
+SELECT name, country_code, urbanarea_pop
+FROM cities
+-- Filter using a subquery on the countries table
+WHERE name IN (SELECT capital
+                FROM countries
+                WHERE cities.name = countries.capital)
+ORDER BY urbanarea_pop DESC;
+
+---- Comparing a JOIN and GROUP BY to a subquery nested in the SELECT statement----
+
+-- First, the JOIN and GROUP BY:
+-- Find top nine countries with the most cities
+SELECT countries.name AS country, COUNT(*) AS cities_num
+FROM countries
+LEFT JOIN cities
+ON countries.code = cities.country_code
+GROUP BY country
+-- Order by count of cities as cities_num
+ORDER BY cities_num DESC, country
+LIMIT 9;
+
+-- Now, with subquery in the SELECT statement
+SELECT countries.name AS country,
+-- Subquery that provides the count of cities   
+  (SELECT COUNT(*)
+   FROM cities
+   --Check to make sure the cities are from a country listed in the countries table
+   WHERE countries.code = cities.country_code) AS cities_num
+FROM countries
+ORDER BY cities_num DESC, country
+LIMIT 9;
+```
+
+Subquery inside a FROM clause
+-Multiple tables can be included in a single FROM clause by adding a comma between them. Such that:
+  SELECT lefttable.id, lefttablevalue
+  FROM lefttable, righttable
+  WHERE left_table.id = right_table.id
+
+```{sql connection=}
+--Select the local name of a country (found in the countries table) and the number of languages spoken (found in the languages)
+-- Select local_name and lang_num from appropriate tables
+SELECT local_name, lang_num
+FROM countries,
+  (SELECT code, COUNT(*) AS lang_num
+  FROM languages
+  GROUP BY code) AS sub
+-- Where codes match
+WHERE countries.code = sub.code
+ORDER BY lang_num DESC;
+```
+

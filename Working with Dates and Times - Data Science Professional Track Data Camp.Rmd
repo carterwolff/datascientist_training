@@ -1,0 +1,106 @@
+---
+title: "Working with Dates and Times - Statistics Datacamp"
+author: "Carter Wolff"
+date: "2023-06-19"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---Parsing data with the lubridate package
+-lubridate is an excellent function for handling date and datetime objects. 
+-the function ymd() and the corresponding familty of functions, handle data regardles of how dates are formatted. Lubridate assumes UTC for timezone with time data.
+-parse_date_time allows you to specify the order of formatted data value. The order argument takes a string of values that correspond to year, month, day, hour, min, sec format identifiers
+-make_date() allows you to make a date by specifying year, month, and date. This allows you to combine year, month, and day columns into a single column. A similar functions works for dates and times: make_datetime()
+
+Integrating lubridate into data pipeline
+-lubridate works nicely with dplyr functions
+-Reccommended to use the specific ymd() family function for your date first, before resorting to parse_date_time(). more efficient and easier to read
+
+Extracting datetime components from datetime objects
+-lubridate contains individual functions for each component of a date time object, including year(), month(), day(), hour(), and more. It also includes functions that return logical values to check the time or date. For example, am() returns a logical value depending on whether it is AM/PM
+
+Rounding datetime objects.
+-lubridate contains three functions for altering datetime objects in R: floor_date rounds down, ceiling_date rounds up, and round_date rounds to the nearest unit. All three require a unit = argument to specify what datetime component you are rounding to, such as unit = "week", unit = "day", or unit = "hour". You can also round to multiples of each unit, such as unit = "5 minutes"
+-While extracting a datetime component only retains that component, rounding maintains all components larger. Rounding to the nearest minute, will remove seconds, but retain hour, day, month, and year.
+
+---Arithmetic for datetime
+-difftime() is a function that works to show the difference between two datetime objects. The function takes three arguments, datetime1, datetime2, and units. The units argument is not required and if left out, R tries to anticipate the units based on the datetime values. Using difftime(date1, date2) is the same as writing date1 - date2
+  -order of the two diff datetime values DOES matter. The later date/time should be the first argument to avoid negative results.
+
+Time Spans
+-lubridate uses two definitions of time spans, periods and durations.
+  -Periods: match human concept of time span. For example, adding a period of one day would give us the same time exactly one day in the future. That means that the        actual seconds between the two datetimes can be variable
+  -Duration: a set length of time, such as the way a stopwatch measures time.
+  -days() represents a timespan defined as a period. ddays() represent a time span presented as a duration. They print out slightly differently. Duration functions in R    all begin with a d, such as dseconds, dyears, etc..
+-A slight variation of time spans that lubridate offers is intervals. Instead of specifying a given value for time like in periods and durations, a start and end point is specifiec. This also allows the user to check if a date is within the specified interval or not. 
+  -You can use intervals with the interval() function or using the %--% operator in R. Thus datetime1 %--% datetime2 is the same as interval(datetime1, datetime2)
+  -there are multiple functions lubridate offers to work with intervals. 
+    -int_start() and int_end extract the start and end of intervals
+    -int_length() gives the length of intervals in seconds
+    -as.period() and as.duration() give the length of an interval as a period or duration respectively.
+    -%within% returns a TRUE/FALSE depending on if a date falls within an interval or not. date1 %within% interval1 returns TRUE or FALSE
+    -int_overlaps returns a TRUE/FALSE depending on if two intervals overlap with each other at any point.
+
+
+```{r}
+# Add a period of one week to mon_2pm
+mon_2pm <- dmy_hm("27 Aug 2018 14:00")
+mon_2pm + days(7)
+#or using the period() function and specifying unit as "days"
+mon_2pm + period(7, units = "days")
+
+# Add a duration of 81 hours to tue_9am
+tue_9am <- dmy_hm("28 Aug 2018 9:00")
+tue_9am + dhours(81)
+
+# Subtract a period of five years from today()
+today() - years(5)
+# Subtract a duration of five years from today()
+today() - dyears(5)
+
+###adding sequences of of datetimes### 
+# Add a period of 8 hours to today
+today_8am <- today() + hours(8)
+# Sequence of two weeks from 1 to 26
+every_two_weeks <- 1:26 * days(14)
+# Create datetime for every two weeks for a year
+today_8am + every_two_weeks
+
+#12 months
+jan_31 = ymd("2023-01-31")
+# A sequence of 1 to 12 periods of 1 month
+month_seq <- 1:12 * months(1)
+
+# Add 1 to 12 months to jan_31 - NA values exist when a month does not have 31 days
+month_seq + jan_31
+
+#%m=% and %m-% add and subtract respectively, while checking whether the last day of the month is 31 or 30 days. It will use the last day of the month as the last value
+# Replace + with %m+% - 
+month_seq %m+% jan_31
+
+# Replace + with %m-%
+month_seq %m-% jan_31
+
+###intervals in R with lubridate###
+
+```
+
+---Time zones in R
+the tz() function in R will extract a timezone component similar to day() and other luubridate extracting functions. 
+-force_tz() will coerce an object to a specified timezone, such as force_tz(date1, tz = "America/New_YorK"). "America/New_York is R's way of specifying EST
+  -force_tz() only changes the defined time. It does not convert the time based on the difference in time zone. (i.e., 19:00:00 UTC -> 19:00:00 EST)
+-with_tz() allows you to view the time of a value in a different, specified timezone. If a value is in "America/Los_Angelos" (PST), you can view it in the "America/New_York" timezone (EST) with the function with_tz(datetime1, tz = "America/New_York)
+
+Importing and Exporting Datetimes
+-using parse_date_time() can be a slow process of importing and formatting datetime. R has to do a lot of work behind the scene to import/format the data. There are functions inside lubridate and other packages to speed up the process of formatting datetimes at the cost of less flexibility in the specified arguments
+-fast_strptime() is a function in lubridate to quickly format datetime objects. It takes a format = argument instead of orders =. This format argument requires a precise format order, such as %Y-%m-%d
+-fastPOSIXct() is a function in the fasttime package that does a similar thing to fast_strptime() in lubridate
+-Exporting
+  -write_csv("file path") will readily export data as datetime formats
+  -stamp() is a function that allows exporting datetime objects in an easy-to-read format such as "Tuesday October 10 2017"
+    -stamp returns a function listing the multiple format types that match your input. It will specify in the console which format it chose
+    -stamp allows contains a format = argument to define the specific format you want to export your data as
+

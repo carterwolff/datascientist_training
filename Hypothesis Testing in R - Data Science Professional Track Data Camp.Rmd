@@ -1,0 +1,99 @@
+---
+title: "Hypothesis Testing In R"
+author: "Carter Wolff"
+date: "2023-07-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---Chapter 1: Introduction to Hypothesis Testing
+Hypothesis tests and z-scores
+-A z score is a metric that is used to standardized values. The z score is calculated as:
+  -z = (sample observation - hypothesized value) / standard error
+  -the z score is compared to the standard normal or z distribution to determine if the observed z score is statistically significant
+    -recall taht the standard normal distribution is a normal distribution with a mean of 0 and sd of 1
+
+p-values
+-calculateing a p-value from a bootstrapping distribution requires pnorm() to determine the probability that your point_estimate is an extreme value or not
+
+
+---Chapter 2: Two-Sample and Anova Tests
+Degrees of freedom represent the number of independent levels in your data set - the # of levels in your independent variable
+
+---Chapter 3: Proportion Tests
+One-sample proportion tests
+-Z scores in chapter 1 required a bootstrap distribution to estimate the standard error of the sample statistic.This is sometimes infeasible or unnessecary. 
+-the proportion test calculates the proportion of the sample which is a test statistic meant to estimate the popultation proportion
+  -the test statistic is still a z score, but the values used to calculate z are different
+      -in one-sample proportion tests, z = (phat - p / standard error(phat)) where phat is the sample proportion of your data and p is the unknown population proportion
+      - assuming a null hypothesis, p = p0. Thus, z = phat - p0 / SE(p) where p0 is the hypothesized value given the null hypothesis - something you define in one            sample
+-the SE(phat) = sqrt((p0 * (1-p0))/n)
+-a z distribution is more appropriate for the one sample test than a t distribution. The t distribution is a normal distribution with fatter tails. Statistically, the fatter tails give more cushion towards avoiding a false positive
+  -mathematically speaking, the reason for fatter tails is because the formula for the t-stat contains xbar in the numerator and denominator. Xbar is an estimate of the    population from the sample data, so it contains uncertainty in the estimate for both the numerator and the denominator
+  -The z test only contains the estimate (phat) in the numerator so it requires a less conservative distribution
+-calculating a p-value with the test statistic z requires pnorm(). pnorm() only provides the p-value assuming one-tail. So for a two-tailed test, it is 2*pnorm()
+
+Two-sample Proportion Test 
+-the two-sample proportion test is similar to the two sample t-test (but with proporitons). That is, the hypothesis is based off the differnce between groups A and B.
+  -the null hypothesis is that there is no difference between proportions A and B. Or in other words H0 = pA - pB = 0
+-The test statistic is z, which takes on a slightly more convoluted formula than a one-sample test. 
+-There are two tests in R that expedite the proportion test
+  -Base R: prop.test() - unfortunately, the syntax of prop.test() is unintuitive, meaning the other option is usually better
+  -infer package: prop_test() - shows similar syntax to other tests/model building functions. 
+      -prop_test() takes the following arguments
+          -formula: proportions ~ categories - the proportion values on the left and the grouping category on the right
+          -order = c() - which of the levels of your category should go first. This is for deciding pA - pB or pB-pA
+          -success = " " -this allows you to specify the reponse value that counts as a sucess in your data
+          -alternative = " " - similar to other tests, is it a one-sided or two-sided test. Notice the swap between . and - in the string call
+          -correct = TRUE/FALSE - should a correction be applied. Usually used for small sample sizes
+
+Chi-sqaure Test of Independence
+-the Chi-sqaure test of independence test whether the proportions of observations for each level in the grouping variable are the same or different
+  H0: The proporiton of observations is the same across all levels in the grouping variable
+-similarly, there is a test in the infer package called chisq_test, which takes a similar syntax to the functions we have seen before
+  -since this is a test of independence, the order of X and Y (or response and explanatory) are irrelevant. 
+    -you are not testing if X is independent from Y, but rather are X and Y independent from each other
+-Unlike the t and z distributions, the chi-square is a right tailed test, since it does not take negative values for the test statistic
+
+Chi-sqaure Goodness of fit test
+-similar to test of independence, but you are comparing a single categorical variable to a hypothesized value, rather than cat var A to cat var B
+-the function chi_sq() is still used, but the arguments are different. Instead of using the response and explanatory variables separated by a ~ :
+  -you need to specify arguments for the sampled proportion and the hypothesized proportions in vector form, thus:
+    -chi_square(response = vector of response props, p = vector of hypothesized props)
+
+---Chapter 4: Non-Parametric Tests
+Assumptions in hypothesis testing
+-there are many assumptions that are inherent with these parametric tests. Some are similar across the tests, such as random sample, or independence. Others are specific to each test. Ultimately, these assumptions must be met for you to appropriately use the test.
+-one way to check this is to create a bootstrap distribution. Assumming the Central Limit Theorem, your bootstrap distribution should show a bell curve
+
+There is only test framework
+-this is a framework is a series of function calls that can be used across multiple tests. It is a flexible way to conduct a myriad of tests, depending on your data
+-the framework contains the following commands (available in the infer package)
+  -specify(): returns a tibble of the defined explanatory and response columns (sort of like select() in dplyr)
+    -for two-sample test, specify(y ~ x, success = " ")
+    -for one-sample test, specify(y ~ NULL)
+  -hypothesize(): declares the null hypothesis
+    -i.e., for chi square and proportion tests, hypothesize(null = "independence") specifies that you are testing for independence
+  -generate(): generate simulated data sets assuming the null hypothesis
+    -generate performs multiple replications of how data may appear if the null hypothesis is true. Thus, it samples or shuffles data to use later on. 
+      -the arguments of generate() are:\
+        -reps = : how many times should generate simulate the data set (i.e., how many replicates)
+        -type = : what type of test are we simulating data for
+          -for tests of independence, type = "permute"
+          -for tests of point, type = "bootstrap" or "simulate"
+  -calcuate(): calculates the test statistic for how many replicates you created from generate. this forms the null distribution
+    -stat = : type of test statistic
+    -order = : ordering of levels
+  -now we compare the observed test statistic (from our original data set) to this null distribution we just created
+    -this means we call specify() and calculate() again, specifying the correct arguments for our data and the appropriate test
+  -finally, call get_p_value() and pass the null distrubtion and your observed statistic
+    -you will also need to define the type of test direction = . this is equivalent to the alternative = argument in previous tests, but the syntax is slightly altered
+-While this farmework is computationally demanding, and requires much more code, it offers a more robust and accurate measure of patterns in your data, especially if the sample size is smaller than the recommended observations needed for each test
+
+Non-parametric ANOVA and unpaired t-tests
+-non-parametric tests do not assume a distribution of the test statistic
+  -simulation based - like we just saw in the infer pipeline
+  -ranked based - the observations in the data are ranked against each other, meaning the magnitude of difference in observations is irrelevant

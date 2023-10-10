@@ -1,0 +1,181 @@
+---
+title: "Intermediate Regression in R"
+author: "Carter Wolff"
+date: "2023-06-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Chp 1: Parallel Slopes
+Parallel Slopes regression is a term for modeling when you have a numeric and categorical variable. 
+-geom_parallel_slopes is a function in the moderndive package that can add regression lines to a ggplot separated by a catergorical variable. It behaviors similar to geom_smooth
+-Meaning of model coefficients in linear regression:
+    -simple regression with one categorical variable - the coefficients represent intercepts for each level of the variable
+    -simple regression with one numerical variable - the coefficients are slope and intercept as you expect in standard y = mx + b format
+    -parallel slopes regression - the coefficients are slope and intercept. For intercept, you should expect an intercept value for each level of the categorical variable
+
+Predicting parallel slopes
+-the prediction workflow works similar for multiple explanatory variables as it does for a single explanatory variable.
+  -this is especially true with the expand_grid() function in the tidyr package.
+    -expand_grid() creates a tibble of all possible combinations of the levels from each variable. Thus, it is useful to create combinations of numeric and categorical         explanatory variables
+    -The syntax for expand_grid(): expand_grid(num_var_name = seq(#sequence of numeric variables), cat_var_name = unique(#vector with cat variable levels))
+      -This can be stored to a variable that will be called later in the predict() function
+  -call predict() after creating the set of explanatory variables (as you would in simple linear regression)
+  -in the same method as simple regression, you can visualize the predictions, by plotting a new geom_point() layer using the prediction dataset
+-one challenge with parallel slops is manually calculating predictions
+  -this is due to multiple intercepts for each level of the categorical variable. Using nested if_else() statements is one way to get around it, but it can be messy. 
+    -Instead, the case_when() function streamlines the process of repeated logical checks. It's general formay is:
+        -case_when(condition 1 ~ value 1, condition 2 ~ value 2, condition 3 ~ value 3, etc...) each of these conditions can be filled with a logical check.
+          -to implement this, check if your condition == the value in the categorical variable column. Then set the intercept of that level from the model object
+  -after manually assigning the intercepts, you can calculate the predicted values from your combination of explanatory variables
+  
+Assessing Model Performance
+-including too many model parameters leads to overfitting, where the model fits tightly too the dataset it was built from, but does not transfer to new data
+  -Adjusted R squared value compensates for increasing parameters (other model performance metrics do this as well, in different ways)
+    -it is available from glance() in the broom package as adj.r.squared
+-Residual standard error can also be used, but the same rule applies to overfitting
+
+Chp 2: Interactions
+Models for each category
+-The parallel slopes returned the same slope for each level of the categorical variable. To determine the slope of each level independently, there are a few approaches.
+  -in dplyr you can use the nest_by() function before calling mutate(). The same is true for base R using split() and lapply()
+  -You can also subset your data for each level. This can be done with filter(cat_var_name == "Level Name"). This can get repetitive if there are a lot of levels
+    -if you filter the data by levels of a categorical variable, you will need to build a model for each model. In addition, you would need to use predict() for each         model independently
+
+One model with an interaction
+-It is better to have one model that is representative of a relationship between entities, rather than a model for each explanatory variable. Thus we use interactions
+  -interactions measure the relationship between explanatory variables and how that interaction effects the dependent variable
+  -You can specify implicit interactions, which include all possible interactions of explanatory variables, or explicit where you define which interactions to include
+    -the syntax for implicit interactions takes a "*": lm(dep_var ~ exp_var1 * exp_var2)
+    -the syntax for explicit requires ever parameter defined with + like normal. And each interaction defined with : as in lm(dep ~ exp1 + exp2 exp1:exp2)
+-The coefficients become difficult to interpret with this, mainly because there is a global intercept and for categorical variables, the level's intercept is in         relation to that.
+  -To get around this, you can specify "+ 0" at the end of the formula call to remove the global intercept
+-This will also make it easier to decipher intercept and slope coefficients for each exp1 and exp2 variable combinations, all within one model.
+
+Making predictions with interactions
+-nothing changes in your call of the predict() function, since R is accepting the model that you already defined with the interaction. 
+-the major change is in the explanatory data set, where you need to use expand_grid() in the tidyr again to get all possible combinations of numeric and cat variable levels
+
+Simpson's Paradox
+-The Simpson's Paradox states that the coefficients of an entire dataset is different than fitting models to subsets within the data set. 
+  -Thus the model representing the whole data set is different that models fitted to subsets of the data set, such as different levels of a categorical variable
+-The times to use an wholistic model versus individual models is dependent on the type of data and the question being asked.
+  -visualizing data before fitting models is an appropriate approach to parse through this question
+-In some cases, the models may disagree because important information is missing in the model. It may require you to include more explanatory variables
+
+Chp 3: Multiple Linear Regression
+Two numeric explanatory variables
+-two approaches to visualizing two numeric explanatory variables
+  -create a 3d scatter plot - using the scatter 3D in the plot3D
+  -use a 2D scatter plot, with a third aesthetic to separate the responses
+-when using 2D scatter plots with ggplot, you can create different color scales with the scale_color_* functions. Built-in and custom color patterns are available
+  
+More than two explanatory variables
+-visualizing more than two explanatory variables is challenging. It is easier to do when one or more variable is categorical, because the levels can be separated with a facet wrap
+-modelling more than two explanatory variables is much easier. The only change is syntax is to add another variable on the right side of the formula arg in lm
+  -The big change that occurs is with interactions. Adding more explanatory variables means that it is possible to model more interactions
+  -specifying interactions can is still done with the same syntax, either implicit or explicit with * and : respectively
+-if you wish to get only two-way interactions for your explanatory variables, you can wrap the explanatory variables with a "^ 2" operator.
+  -lm(dep ~ (exp1 + exp2 + exp3)^2, data = data) will tell R to only include the explanatory variables individually and ONLY two way interactions, meaning exp1:exp2:exp3 will not be a part of the model.
+    -this is why the I() function is used in a model when you want to square your explanatory variable
+
+How linear regression works
+-Regression revolves around finding ways to reduce the difference between oberved values and predicted values. In linear regression, this is represented as residuals.
+  -in any regression, there is an optimization procedure that takes an equations and finds the most optimal solution (which differs depending on the function)
+  -most of the time, R is able to calcuate this, especially for simple models like simple linear regression
+  -in more complex cases, you need to select an optimization procedure manually.
+-the optim() function can take a function and return optimization parameters that you specify
+  -optim(par = initial guess at optimal parameter, fn = function_name) #notice no parantheses with the function name
+  -optim returns a list with "par" for the parameter estimation, "value" with the value of y from the function, counts, convergence, and message which are all diagnostic values
+  -optim only accepts one argument for function, so if you have multiple arguments in your function, you need to pass them as a vector
+  
+Chp 4: Multiple logistic regression
+Multiple logistic regression
+-the formula for logistic regression is similar to that of linear regression. That is + and * operators behave the same way
+-predicting values is also similar:
+  -Creating the dataset of explanatory variables used is the same, using expand_grid()
+  -You need to specify type = response in the predict() function
+-visualization is slightly more tricky
+  -setting color as the response is a good way to separate when you have two numeric explanatory variables
+    scale_color_gradient2(midpoint = 0.5) will create a color gradient at the midpoint, which is useful if your color aes is the response variable (the prob of an event)
+
+The logistic distribution
+-distributions are based on the probability density functions. For example, dnorm generats the typical bell curve which follows gaussian (normal) distribution. 
+-integrating the area of the probability density curve, gives the cumulative density function (pnorm)
+-the inverse of pnorm is the inverse cumulative distribution funciton or qnorm. It represents the quantile where you would observe a value, x
+  -in other words, it represents a plot with the probabilities of x (where the quantiles comes into play) on the x-axis, and the value of x on the y-axis
+-The logistic probability density function (dlogis) behaves similar to the gaussian (normal) probability density function. It is a bell curve.
+  -the difference is, that the tails of the distribution are fatter relative to the gaussian distribution
+-the cumulative distribution function (plogis) is also called the logistic function (hence logistic regression)
+-the inverse cumulative distribution function (qlogis) is sometimes called the logit function
+
+How logistic regression works
+-in linear regression, the metric to optimize was the sum of squares. For logistic regression, the metric is likelihood. 
+  -the goal is to find the maximum likelihood value
+  -the value of likelihood is calculated as L = sum(y_pred * y_actual + (1 - y_pred) * (1 - y_actual))
+    -given that actual response only take on a 0 or 1, this equation can be further simplified
+      -When y_actual = 1, L = sum(y_pred) -> as y_pred increases, so does L to a maximum likelihood of 1
+      -when y-actual = 0, L = sum(1 - y_pred) -> as y_pred increases, so does L to a minimum likelihood of 1
+      -remember the goal is to find max(L), s a model that sees large y_pred values when y_actual is 0 indicates a poor performing model
+-when calculating likelihood, all y-pred values are between 0-1. Adding up these small numbers doesn't manifest in and descernable difference
+  -the better approach is to calculate the log_likelihood, which is the log of the y_pred values
+    Log L = sum(log(y_pred) * y_actual + log(1 - y_pred) * (1 - y_actual))
+-the optimum function defaults to finding the minimum of a parameter, so we use negative log likelihood to trick R into finding the maximum
+
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+###plotting the logistic cumulative distribution function
+logistic_distn_cdf <- tibble(
+  x = seq(-10, 10, 0.1), #creating a set of vectors, x
+  logistic_x = plogis(x), #converting x values to probability of x
+  logistic_x_man = 1 / (1 + exp(-x)) #manually calulating probability using the logistic function - should equal logistic_x values
+)
+
+# Using logistic_distn_cdf, plot logistic_x vs. x
+ggplot(logistic_distn_cdf, aes(x, logistic_x)) +
+  # Make it a line plot
+  geom_line()
+
+###plotting inverse logistic cumulative distribution function (logit function)
+logistic_distn_inv_cdf <- tibble(
+  # Make a seq from 0.001 to 0.999 in steps of 0.001
+  p = seq(0.001, 0.999, 0.001),
+  # Transform with built-in logistic inverse CDF
+  logit_p = qlogis(p), 
+  # Transform with manual logit
+  logit_p_man = log(p/(1-p))
+) 
+
+# Using logistic_distn_inv_cdf, plot logit_p vs. p
+ggplot(logistic_distn_inv_cdf, aes(p, logit_p)) +
+  # Make it a line plot
+  geom_line()
+
+###calculating negative log likelihood to find optimal slope and intercept of logistic function
+###NOTE this data comes from the churn dataset available in data camp, but not readily available for import
+# Function to calculate -sum log likelihood with intercept and slope parameters passed in a vector coeffs
+calc_neg_log_likelihood <- function(coeffs) {
+  intercept <- coeffs[1]
+  slope <- coeffs[2]
+  y_pred <- plogis(intercept + slope * x_actual) #calulating predicted y-values under assumption of logistic cumulative distribution function
+  log_likelihoods <- log(y_pred) * y_actual + log(1 - y_pred) * (1 - y_actual)
+  -sum(log_likelihoods)
+}
+
+# Optimize the metric
+optim(
+  # Initially guess 0 intercept and 1 slope
+  par = c(intercept = 0, slope = 1), #set initial guess of parameters for slope and intercept
+  # Use calc_neg_log_likelihood as the optimization fn 
+  fn = calc_neg_log_likelihood #function specified earlier that will take the vector coeffs (i.e., intercept = 0, slope = 1)
+)
+
+```
+
+  

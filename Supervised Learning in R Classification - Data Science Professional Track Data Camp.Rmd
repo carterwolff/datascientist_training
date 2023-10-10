@@ -1,0 +1,318 @@
+---
+title: 'Supervised Learning in R: Classification'
+author: "Carter Wolff"
+date: "2023-07-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Classification is the type of machine learning when the concept to be learned by the machine is a set of categories. Examples of classification include image detection, weather prediction, and disease identification
+
+---Chapter 1: k-Nearest Neighbors (kNN)
+-Nearest neighbor classification implies that an object of similar traits should elicit a similar response
+  -I.e., in image detection, if it looks like a stop sign, that should be an indication to stop. If it is yellow and triangular or diamond, it is a sign to yield
+-The similarity of signs are measured with the distance in feature space. Feature space is the representation of properties in plotted space.
+-The example in the code shown below uses image detection of signs based on knn. Knn takes an input of data to train a model on WITHOUT any labels. It also takes an argument for test = which is a dataframe that you wish to test (i.e., classify). Finally, it takes a vector of labels to give each row in the train data. This is the classification that you are applying. For the example in the code below, this is the type of sign.
+-The data for this example is the rgb color scale of each image. Images were split in a 4x4 grid. In each square, the rgb levels were measures. Thus, the column, b13 represents the blue color level in square 13. 
+-The three levels of sign types are pedestrian, speed, and stop
+-the knn() function measures the nearest neigbor based on Euclidean distance for each row of the training set
+
+
+```{r}
+library(class)
+library(readxl)
+library(dplyr)
+
+signs <- read_excel("trafficsignimagedata.xlsx", sheet = 1)
+
+###The next two ligns of code take a set of known data to train image prediction of signs.
+# Create a vector of labels - used in knn
+sign_types <- signs$sign_type
+
+# Classify the next sign observed using signs data as the test data WITHOUT labels 
+# The next_sign is an object with the same parameters as the train data. It will return a label based on the cl = vector that is passed
+knn(train = signs[-1], test = next_sign, cl = sign_types)
+
+###Second Example predicting sign type on multiple test images called test_signs (not available in R)
+# Use kNN to identify the test road signs
+sign_types <- signs$sign_type
+signs_pred <- knn(train = signs[-1], test = test_signs[-1], cl = sign_types)
+
+# Create a confusion matrix of the predicted versus actual values
+signs_actual <- test_signs$sign_type
+table(signs_pred, signs_actual)
+
+# Compute the accuracy - whens signs pred = signs actual, a value of 1 will be given. Otherwise a 0 is given. In this example, the accuracy is 0.9322
+#The code will not execute since the test_signs dataframe is not loaded in
+mean(signs_pred == signs_actual)
+```
+
+the k in Knn
+-k specifies the number of nearest neighbors to consider. By default, k is 1 in R.
+-Setting k to a small number detects minuscule patterns in the data set. This usually comes at the cost of missing the bigger pattern across the data set.
+-Setting k to a large number misses the subtle patters, but you get a better representation of the patterns across the data set.
+-There is not a universal approach to deciding on what k should be for each data set
+  -Ultimately, the most appropriate value of k depends on the data set and the pattern you are trying to detect
+  -one commmon approach is to set k to the sqrt(# of observations in training data)
+  -it is customary to test mutliple values of k and compare them to determine the most accurate model.
+-In the knn() function, setting prob = TRUE will produce the confidence of the prediction from the model. This is a value between 0 and 1 and is a measure of the k number of neighbors used to make the prediction
+  -after specifying prob = true, it will create an attribute in the model object. Recall that your can pull out an attribute with the attr() function, like so.
+    -sign_probs <- attr(sign_predicted, "prob"). In this example, prob created from prob = TRUE is pulled out of sign_predicted, which is the knn model
+
+```{r}
+###Evaluateing three different measures of k - again the signs_test dataframe is not available so we cannot execute this code
+# Compute the accuracy of the baseline model (default k = 1)
+k_1 <- knn(train = signs[-1], test = signs_test[-1], cl = sign_types)
+mean(k_1 == signs_test$sign_type) #from datacamp code, mean = 0.9322034
+
+# Modify the above to set k = 7
+k_7 <- knn(train = signs[-1], test = signs_test[-1], cl = sign_types, k = 7)
+mean(k_7 == signs_test$sign_type) #from datacamp code, mean = 0.9491525 which is the most accurate of the three k values
+
+# Set k = 15 and compare to the above
+k_15 <- knn(train = signs[-1], test = signs_test[-1], cl = sign_types, k = 15)
+mean(k_15 == signs_test$sign_type) #from datacamp code, mean = 0.8983051
+```
+
+Data preparation for kNN
+-kNN assumes numeric data, since it needs numeric data to calculate the distance
+  -if you want to incorporate categorical variables, you would use a categorical variable
+-The range of values used in training data should be similar across columns. 
+  -if one variable in your model ranges from 0-1000 and another ranges from 0-1 (i.e., a categorical dummy variable), the larger range will have more influence
+    -this is because knn uses euclidian distance. so 0-1000 appears larger than 0-1
+  -rescaling the larger range to that of the smaller range is an appropriate way to correct this issue
+    -this is called normalization, but there is no built in function in R.
+      -one way to do this is through min-max normalization which scales a factor so its minimum value is 0 and its maximum value is 1.
+        min-max normalization: x - min(x) / max(x) - min(x)
+        
+---Chapter 2: Naive Bayes
+Understanding Bayesian methods
+-Bayesian statistics revolves around making preditions on a data set, given some historical knowledge about the data. This historical knowledge is called "priors" and can work in machine learning classification as well as other forms of data analysis
+-Some examples of the application of Bayesian machine learning: Smartphones that have user preference data stored, a meteoroligist making weather prediction based on similar past observations, etc...
+-Bayesian statistics calculates the probaility of an event given the historical data. Like any probability, it is the # of events / # of all outcomes
+    -I.e. when your phone checks your location at regular intervals: P(being at work) = # of times phone pinged work location / # of phone pings overall
+-Predictions under Bayesian statistics doesn't rely on a single probability event. Rather, multiple events are combined into a single prediction
+  -for Bayesian statistics, we consider conditional probability. That is, we calculate the probability of event A given event B
+    -This is often written as P(A|B). It can also be written as P(A and B) / P(B)
+    -I.e., the probability your phone records you at work, GIVEN the time of day. Here the time of day influences the likelihood that you are at work
+-The package naivebayes in R provides the tools to build a model to estimate the probabilities in the way we spoke above
+  -the function naive_bayes() takes arguments of formula and data = just like we saw in lm()
+  -after building the model with naive_bayes() you can call the predict() function, pass the model and a set of future conditions that the model accepts. 
+  
+The following code uses a data set called locations, which is Brett's (Datacamp instructor) location recorded at 9 am for 13 weeks. The data set also includes daytype which is labeled as weekend or weekday. We use this set to predict where Brett is based on what daytype it is. In other words, P(A) = location, P(B) = daytype, and we are interested in P(A | B) aka P(Location | daytype).
+```{r}
+# Load the naivebayes package
+library(naivebayes)
+library(readxl)
+library(dplyr)
+
+
+locations = read_excel("brettlocation.xlsx")
+thursday9am = tibble(daytype = "weekday")
+saturday9am = tibble(daytype = "weekend")
+
+#filter to only include work hours (which is how the data appears in the early Data Camp exercises)
+where9am_work <- locations %>%
+  filter(hourtype == "morning" | hourtype == "afternoon")
+
+# Build the location prediction model
+locmodel <- naive_bayes(location ~ daytype, data = where9am_work)
+
+# Predict Thursday's 9am location
+predict(locmodel, thursday9am)
+# Predict Saturdays's 9am location
+predict(locmodel, saturday9am)
+
+###Using the prob = TRUE argument in predict() to predict the probilities of being in any of the listed locations given daytype
+# Examine the location prediction model to see the list of prior and posterior probabilities
+locmodel 
+# Obtain the predicted probabilities for Thursday at 9am
+predict(locmodel, thursday9am , type = "prob")
+# Obtain the predicted probabilities for Saturday at 9am
+predict(locmodel, saturday9am, type = "prob")
+
+
+###New data including all times of day and hourtype into the model - two predictor variables
+weekday_afternoon <- tibble(daytype = "weekday", hourtype = "afternoon", location = "office")
+weekday_evening <- tibble(daytype = "weekday", hourtype = "evening", location = "home")
+
+# Build a NB model of location
+locmodel2 <- naive_bayes(location ~ daytype + hourtype, data = locations)
+
+# Predict Brett's location on a weekday afternoon
+predict(locmodel2, weekday_afternoon)
+
+# Predict Brett's location on a weekday evening
+predict(locmodel2, weekday_evening)
+
+###applying Laplace correction
+weekend_afternoon <- tibble(daytype = "weekend", hourtype = "afternoon", location = "home")
+
+# Observe the predicted probabilities for a weekend afternoon - some values have 0
+predict(locmodel2, weekend_afternoon, type = "prob")
+
+# Build a new model using the Laplace correction
+locmodel3 <- naive_bayes(location ~ daytype + hourtype, data = locations, laplace = 1)
+
+# Observe the new predicted probabilities for a weekend afternoon - no values have 0
+predict(locmodel3, weekend_afternoon, type = "prob")
+```
+
+Understanding NB's "naivety"
+-The previous code was a simple model that used one predictor, daytype. 
+-More sophisticated models can help create more accurate predictions, but additional explanatory variables get messy with conditional probability. 
+    -with a single predictor: conditional prob = overlap of A and B, represented as P(A | B)
+    -with two predictors: conditional prob = overlap of A, B, AND C, represented as P(A | B) AND P(A | C)
+    -increase the number of predictors is also messy in R, so the naive_bayes() function makes an assumption that events are independent from each other
+-The shortcut of the naive_bayes() model building is why it is called "naive." Treating predictors as independent from each other allows R to only handle simple overlaps of two events, rather than considering overlap of 3+ events
+  -Even though this is not the stastically correct way to represent the probability of these events, multiple sources agree that naive_bayes() still represent real world data appropriately
+-Especially when we build more complicated models, there is a chance we run into situations where a combination of events did not occur in our data set. For Brett's location data, there is no observation of being at work on the weekend. Thus, when calculating that probility, it will always result in a value of 0.
+  -to get around this, naive_bayes() contains an argument called laplace = , which is default 0. This applies a laplace correction, where the number you specified is added to the tally of events. Doing so removes the 0 events recorded and allows a probability to be calculated.
+
+Applying Naive Bayes to other problems
+-Naive Bayes needs to work with categorical data, so it can effectively calculate an event with a corresponding outcome. This is why Brett's location data bins time of day into categories like morning and afternoon, rather than a numerical hour of the day. 
+-Naive Bays also struggles with unstructured data, like text files. To get around this, naive bayes applies the "bag of words" approach. This creates an event for every word in the document. In spreadsheet form, the rows are the documents and the columns are words that may appear in the document. The cell is then a quantification of how many times the word appeared in the corresponding document. This is the "event" that is created from the bag of words model
+  -this can have application in spam email identification for example, since spam emails should have more of certain words than regular emails do.
+
+---Chapter 3: Logistic Regression
+Regression methods work to model numerical explanatory variable. For logistic regression, this is when there is a binary response variable
+-remember when predicting using the predict() function, type = "response" is necessary to return probabilities from the model predictions, rather than log odds
+
+Model Performance Tradeoffs
+-In classification models, there is an issue when the model is asked to predict something rare. The model produces a misleading model accuracy for predicting the opposite choice from the rare event.
+-ROC curves
+  -ROC curves allow us to visualize the percentage of positive examples versus the percentage of all other outcomes.
+  -A model that is no better than random chance will show a diagonal line as the correct outcomes predicted increases evenly with the incorrect outcomes the model predicts.
+  -A stong performing model will show a positive curve above the diagonal line. This indicates that the percent of correct predictions is increasing faster than the % of negative predictions.
+  -In any of these cases, you can take the AUC (area under the curve) to assess model performance. A model with AUC = 0.5 (diagonal line) indicates the model did no better than random chance. An AUC = 1, indicates that the model predicts correctly 100% of the time. An strong model is somewhere in that range, ideally closer to 1
+  -AUC should not be an end all. ROC that show different curves can have the same AUC. Thus, the different models are better at different things. It is important to look at the ROC and AUC values along with the context of you data.
+  -the pROC package in R allows us to draw ROC curves, using the function roc(). roc() creates an object that can be plotted using plot(). For roc() use pass actual and predicted values into the function
+    -for roc(), pass the vector of actual values, followed by the predicted probabilities. You can also caluclate the AUC with the function auc() that accepts your roc object
+
+Dummy Variables, Missing Data, and Interactions
+-Missing values are straightforward with categorical variables. Usually, the best option is to create an additional level labelled "missing" or "other."
+-Missing values for numeric variables is trickier. One approach is called imputation, which is an educated guess about what the value should be
+  -imputing data can be done in several ways. 
+    -mean imputation: imputing missing values with the mean of the column. 
+    -imputations often include an additional column that represents imputed data, usually with a binary, yes/no response
+-Interaction effects in logistic regression is similar to lm, using the R model interface.
+
+Automatic feature selection
+-Building models with different parameters means that sometimes it is difficult to decide what parameters to include or omit. Naturally, there is a way to automate this process, but it comes at the risk of violating a lot of assumptions that go into regression modelling
+-Stepwise regression: evaluate each parameter to determine if it belongs in the final model. 
+  -types of stepwise regression
+    -backward stepwise: remove predictor and recheck model without predictor. if removing the predictor doesn't significantly change the model, then it can be removed
+        -this process continues until only influential predictors remain
+    -forward stepwise: start with a model with no predictors, add the most influential parameter, then recheck model and add next most influential predictor
+  -building a stepwise regression model can be done with the step() function in R. It requires a few arguments. Whether forward or backward step regression you will         need to specify an upper and lower limit. The widest this can be is a model with no parameters and a model with all parameters
+  -arguments for step(): step(object = , scope = , scale = 0, direction = c("both", "backward", "forward"), ...)
+    -object: model object that you will start with
+    -scope: the upper and lower bounds for you model. Usually a model object with no parameters and a model object with all parameters as lower/upper respectively
+    -direction: forward versus backward step regression. or both
+  -an example of stepwise regression is shown in the code below with the donors data set
+  
+```{r}
+# Specify a null model with no predictors
+null_model <- glm(donated~1, data = donors, family = "binomial")
+
+# Specify the full model using all of the potential predictors
+full_model <- glm(donated ~ ., data = donors, family = "binomial")
+
+# Use a forward stepwise algorithm to build a parsimonious model
+step_model <- step(null_model, scope = list(lower = null_model, upper = full_model), direction = "forward")
+
+# Estimate the stepwise donation probability
+step_prob <- predict(step_model, type = "response")
+```
+
+    
+---Chapter 4: Classification Trees
+Making decisions with trees
+-There are multiple packages in R that incorporate the building of trees. The most common is rpart, which stands for rpartitioning.
+-rpart includes the function rpart(), which takes a formula/data in the R formula ui layout. The method = "class" argument will tell R to build a classification tree. 
+-you can look at the following data that builds a simple tree and visualizes the decision tree
+
+```{r}
+# Load the rpart package
+library(rpart)
+
+# Build a lending model predicting loan outcome versus loan amount and credit score
+loan_model <- rpart(outcome ~ loan_amount + credit_score, data = loans, method = "class", control = rpart.control(cp = 0))
+
+# Make a prediction for someone with good credit
+predict(loan_model, good_credit, type = "class")
+
+# Make a prediction for someone with bad credit
+predict(loan_model, bad_credit, type = "class")
+```
+
+
+Growing Larger Classification Trees
+-Deciding where to split your tree is based on which provides the more pure split.
+  -By more pure, we mean whichever split provides the more homogeneous categorization
+-Of all the machine learning approaches, decision trees are most prone to overfitting, especially as models become more complex. Thus it is a custom to test your model's performance on data that was not used to build the model (i.e., train and test data), which ideally is done in all machine learning approaches
+    -A typical approach is to hold out a piece of the data set to be used as the test set. This is roughly around 25% of the data
+
+Tending to Classification Trees - Pruning
+-Pruning is a process of limiting the growth of decision trees by removing certain branches.'
+-Pruning can occur before the model is built - i.e., Prepruning
+  -Some common prepruning techniques are to control the max depth a tree is allowed to get, or to create a minimum # of observations needed for a split to happen
+  -The issue with prepruning is that it can create a model that does not have strong predictive power that would be discovered with more layers. 
+-Pruning can also occur after the model is built - i.e., Postpruning
+  -in postpruning, branches with minor impact on the models prediction power are removed. 
+  -as models become more complex, they make less errors, thus error rate decreases with increasing complexity
+      -this trend is not linear. There is a dampening effect of reducing error rate by increasing model complexity. A good point to post-prune is when the error rate    plateu's
+-Pre and Post Pruning in R
+  -both pruning methods work with the rpart decision tree.
+  -Prepruning occurs when building the model and uses the control = rpart.control() argument in the model rpart
+    -for instance, you can apply a maxdepth and a minsplit using control = rpart.control(maxdepth = 30, minsplit = 20)
+  -Postpruning requires ploting the error rate with plotcp() which takes a model object
+    -after plotting, call prune() and pass your model. Next use the cp = argument to define the cut point (cp)
+The code below describes how you can preprune and post prune trees
+
+```{r}
+### Prepruning Grow a tree with maxdepth of 6 - with a cutpoint of 0 - using all parameters 
+loan_model <- rpart(outcome ~ ., data = loans_train, method = "class", control = rpart.control(maxdepth = 6, cp = 0))
+
+# Make a class prediction on the test set
+loans_test$pred <- predict(loan_model, loans_test, type = "class")
+
+# Compute the accuracy of the simpler tree
+mean(loans_test$outcome == loans_test$pred)
+
+### Postpruning - Grow an overly complex tree
+loan_model <- rpart(outcome~., data = loans_train, method = "class", control = rpart.control(cp = 0))
+
+# Examine the complexity plot
+plotcp(loan_model)
+
+# Prune the tree
+loan_model_pruned <- prune(loan_model, cp = 0.0014) #cp based on the error rate shown from plotcp()
+
+# Compute the accuracy of the pruned tree
+loans_test$pred <- predict(loan_model_pruned, loans_test, type = "class")
+mean(loans_test$outcome == loans_test$pred)
+```
+
+Seeing the forest from the trees - The Random Forests
+-Rather than one enormous decision tree, The random forest contains individual trees that are simple and unique. each tree is grown on different training data, which creates a more sophisticated machine learning algorithm
+-With individual decision trees, each tree is sophisticated at one task. In modeling terms, each tree makes a predictions, and the overall prediction of the forest is decided by majority vote. If 40 trees predict a loan default while 35 predict it is repaid, the overall prediction of the forest is a default loan prediction
+-The R package randomForest allows you to build a model simlar to that of the rpart specified earlier. 
+  -two arguments of importance in rpart(formula = , data = , ntree = , mtry = )
+      -ntree = number of trees in the forest - should be set relatively large
+      -mtry = number of predictors per tree - by default is the sqrt of the # of predictors
+-See the code below for a simple random forest on the loan data
+```{r}
+# Load the randomForest package
+library(randomForest)
+
+# Build a random forest model
+loan_model <- randomForest(outcome ~ ., data = loans_train) #ntree is not specified in this example
+
+# Compute the accuracy of the random forest
+loans_test$pred <- predict(loan_model, loans_test, type = "class")
+mean(loans_test$outcome == loans_test$pred)
+```
+

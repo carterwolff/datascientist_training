@@ -1,0 +1,31 @@
+---
+title: "Experimental Design in R"
+author: "Carter Wolff"
+date: "2023-07-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+---Chapter 1: Introduction to Experimental Design
+Power and Sample Size
+-Power: probability that the test correctly rejects the null hypothesis when the alternative hypothesis is true
+  -effect size: measure of the difference you are trying to detect
+  -sample size: measure of the number of observations that you collect
+-power calculation can be caluclated with the pwr.anova.test() function in the pwr package
+  -k = number of groups
+  -n = number of observations in each group
+  -f = effect size
+  -sig.level = alpha value
+  -power = the power level of the test
+  -defining the value for any four of these will allow you to calculate the value of the fifth. For the metric you wish to calculate, list the argument as NULL
+      -i.e., power = NULL will allow you to calculate the power from the other four arguments
+
+---Chapter 2: Basic Experiments
+
+
+---Chapter 3: Randomized Complete and Balanced Incomplete Block Designs
+
+
+---Chapter 4: Latin Squares, Graeco-Latin Squares, and Factorial Experiments

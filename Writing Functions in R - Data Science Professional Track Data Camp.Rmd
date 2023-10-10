@@ -1,0 +1,120 @@
+---
+title: "Writing Functions in R"
+author: "Carter Wolff"
+date: "2023-06-21"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Converting scripts into functions
+-The syntax for defining a function is:
+  my_fun <- function(arg1, arg2){
+  #body of the function - what you want the function to do
+}
+-To specify an argument with a default, you can call it in the initial function statement such as:
+my_func <- function(arg1, arg2, arg3 = default value){
+  body
+}
+  -in the above function, arg3 is "default value" if nothing is passed to it when calling the function
+```{r}
+#write a simple function to toss a coin n_flips number of times with the probability of heads as p_head
+toss_coin <- function(n_flips, p_head) {
+  coin_sides <- c("head", "tail")
+  # Define a vector of weights
+  weights <- c(p_head, 1-p_head) #probability of tails = 1-p_head since it must add up to 1
+  # Modify the sampling to be weighted
+  sample(coin_sides, n_flips, replace = TRUE, prob = weights)
+}
+
+# Generate 10 coin tosses
+toss_coin(n_flips = 10, p_head = 0.8)
+```
+Types of arguments in a function:
+-Data arguments: an argument for you to compute an action on, like a dataframe
+-Detail arguments: the action taking place (i.e., mean, run linear model, etc)
+
+Passing arguments from one function to another
+-the "..." in an argument allows simplification of code. It tells the function to accept any type of argument into the call of the function. It requires a deeper         knowledge of the inner function to know whether to trust the type of arguments people may pass when calling your function
+
+Checking arguments of a function
+-placing assertive checks in your functions can throw errors if the user passes an argument that doesn't meet the conditions or requirements of your function. This can be helpful to make sure that users pass the right data type for your function, such as a required numeric value.
+  -the assertive package in R has many conditions to check if a variable type is approriate. It allows contains functions on how to handle issues of passing values of    the wrong data type
+  
+```{r}
+#function to calculate the harmonic mean
+calc_harmonic_mean <- function(x, na.rm = FALSE) {
+  # check that the data passed as x is a numeric object 
+   assert_is_numeric(x)
+  # Check if any values of x are non-positive - not appropriate to calculate harmonic mean when negative numbers are present
+  if(any(assert_all_are_non_positive(x), na.rm = TRUE)) {
+    # Throw an error that tells the user the specific error
+    stop("x contains non-positive values, so the harmonic mean makes no sense.")
+  }
+  x %>%
+    get_reciprocal() %>%
+    mean(na.rm = na.rm) %>%
+    get_reciprocal()
+}
+```
+
+Returning values of a function
+-by default, the last value calculated is return, but you can return others values from a function as well
+  -the simple method for returning values is return() which can be called anywhere inside your function
+-you can also use other functions to return desired values, such as
+  -invisible() - return a value not shown in the console
+  -warning() - return a warning with custom code if a condition is met (i.e., NAs exists for a mean calculation)
+  -stop() - abruptly stop a function if a condition is met. Similar to warning() with the inclusion of custom code
+-returning values is helpful if you don't need to execute the entire function when the condition is met. It can also provide information to the user that an inapropriate value, data type, argument, etc... is passed to the function
+
+Returning multiple values
+-by default R can only return a single value. You can workaround this by returning a list, or other object by creating it in the function (i.e., a data frame)
+-you can also use the multi-assignment operator %<-% to return multiple values. This operator is available in the zeallot package in R
+  -the %<-% operator
+-You can use attributes to return multiple values as well. 
+  -the attributes() returns all the attributes of an object, while the attr() function can return a specific attribute, such as row names
+  -attributes are additional information available for lists, dataframes, and more. For example, a data frame has an attribute for the column names, row names/number,    and the object type of each of the columns. This is information that R can return when calling functions
+  -these attributes can be accessed nicely with dplyr, but dplyr expects a data frame object input and output, so it would not be appropriate for lists
+
+The broom package
+-the broom package has functions designed to extract useful information from models. There are three main functions that do so.
+  -glance(): returns model level values, such as degrees of freedom and AIC
+  -tidy(): returns the coefficients level values, such as the p-value and intercepts
+  -augment(): returns observation level values, such as residuals
+
+```{r}
+#function to store model information into a list using the broom package functions, glance(), tidy(), and augment()
+groom_model <- function(model) {
+  list(
+    model = glance(model),
+    coefficients = tidy(model),
+    observations = augment(model)
+  )
+}
+
+# Call groom_model on model, assigning to 3 variables
+# the function groom_model returns three values all stored in a list (see code above). The %<-% operator (zeallot package) separates them into three different tibbles
+c(mdl, cff, obs) %<-% groom_model(model)
+
+# See these individual variables
+mdl; cff; obs
+```
+
+Environments
+-type of variable used to store other variables
+-environments have parent environments that they reside in. 
+  -when an R package is loaded, it gains an environment to store its information and variables
+-the search() function works to call available environments, which you can use to track information each package and environment have available
+-exists() functions to check if a variable is in a given environment
+  -if the variable is not available in the defined environment, R will looks in the parent environment, then the grandparent environment. And so-on until R finds the     variable, or there are no more environments to look in.
+      -you can restrict the exists() function to only look in the specified environment with the inherits = FALSE argument
+-the highest level (root parent) environment is the empty environment.
+-you can convert lists to environments using the list2env() function
+
+Writing functions to work with model predictions
+-Building models allows us to make predictions about future trends in our dataset. This is done commonly by using the predict(), which takes the following syntax:
+  -predict(model, cases_to_predict, type = "response") where cases_to_predict is a data frame of values that your model recognizes as explanatory variables
+
+

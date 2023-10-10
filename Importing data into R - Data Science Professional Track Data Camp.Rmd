@@ -1,0 +1,41 @@
+---
+title: "Importing data into R - Datacamp Course"
+author: "Carter Wolff"
+date: "2023-06-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This course discuss importing data into R as a dataframe. The sources of data fall under five general categories. 1) Flat files 2) Excell files 3) Data from databases 4) Data from other statistical softwares and 5)
+-If the data is located in the same place as the working directory, the input is straightforwards. If not, you need to specify the directory, usually with file.path or file.choose functions
+
+-flat files are not always formatted in the same way. The two most common are comma separated and tab delimited files which use specific functions. If you have a unique delimiting character, such as "/" you can use read.table which has much great flexibility but requires more arguments.
+-if your data is not availabe in table or comma delimited formats, use read.table(). Here you need to specify the character to separate data using the sep = argument. Also, while read.csv() and read.delim() default to header = TRUE, read.table() defaults to header = FALSE.
+
+---The read in packages
+The readr package
+-The readr package is faster and more straightforward than utils (where read.csv() like functions are housed). One benefit of the readr package is that it imports data as tibbles rather than data frames which allow more manipulation to the data set. The function nomenclature is similar to that of the utils function, such as read_csv, read_tsv (tab separated values) and read_delim
+
+The data.table package
+-data.table package is favored when you are dealing with very large files that you intend to manipulate. It contains a read in function, fread()
+-fread does well to infer column types and names in most cases. And it does so in a fast and efficient way. 
+
+The readxl package
+-readxl handles excel files, commonly formatted as tabular separations
+-the two major functions of readxl are excel_sheets() and 
+  -excel_sheets() takes a file path argument and returns a character of the sheets
+  -read_excel() imports the data as a tibble. In read_excel, you can specify the sheet of excel to load, by listing the sheet number (sheet = #) or the sheet name (sheet = "Name")
+
+The gdata package
+-behaves similar to the base utils packages like read.csv() except for excel files. It calls the read.csv() file which is a unique variant of the read.table() function
+-gdata accomplishes the same functions as the readxl package. At the time of the Datacamp course, readxl was new and under development hence the reason for introducing the gdata package
+
+The XLConnect package
+-Bridge between excel and R. This package allows you to work on many excel spreadsheets through R. It depends on the Java language to handle many of the functions we are familiar with
+-the first step is to load the workbook, using the loadWorkbook function. This function passes the excel file as a workbook object into R. While the name of some of these functions are different, their functionality and arguments are generally the same.
+-importing data into R can be handled by all other packages listed so far. Where XLConnect shines is its ability to export data back into the workbook, such as creating a new sheet using the function writeWorksheet(). This however requires you to save the new workbook in R using the function saveWorkbook()
+-renameSheet() allows you to rename individual sheets in the workbook. This also requires you to specify saveWorkbook() at the end
+-removeSheet() removes a sheet in your workbook, requires saveWorkbook()

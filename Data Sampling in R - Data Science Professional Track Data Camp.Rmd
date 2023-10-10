@@ -1,0 +1,47 @@
+---
+title: "Data Sampling in R"
+author: "Carter Wolff"
+date: "2023-07-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Simple vs Systematic Random Sampling
+-simple sampling: typically sampling where every value has an equal chance of being selected
+-systematic sampling: sample at a regular interval (i.e., every third value is sampled)
+  -for integer sampling, it is beneficial to have row ids, then you can take the row length and use it with the desired sample size to select the desired sample
+  -one problem with systematic sampling is that patterns in data can add bias to the sample. Thus it is usually not an ideal sampling method
+
+Stratified and Weighted Random Sampling
+-Stratified sampling samples data assuming a certain block or subcategoration of the data, such as sampling countries with a block on continent
+-Weighted sample applies a weight to each observation, which is determined by some variable within the data set. A higher weight means it is more likely to be sampled
+  -the weight is passed into the slice_sample() function in the weight_by = argument
+
+Cluster Sampling
+-cluster sampling is when you limit the sample based on specific levels of a variable. Thus, only those levels will appear in the sampled dataset
+-cluster sampling usually works in dplyr by filtering the data set for the desired levels before calling slice_sample()
+
+Relative error of point estimates
+-the most common approach to evaluate the sample size is the relative error which is: 
+  -abs(population mean - sample mean) / population mean * 100 to convert it to a percentage
+-you can plot the relative error versus the sample size which depicts how the relative error changes when you increase sample size
+  -this plot depicts how adding a few observations to a data setwhen the sample size is large has little effect on the relative error
+
+Creating a Sampling Distribution
+-We can create a sampling distribution using the replicate() function in base R. It requires two arguments: n = and expr = where n is the number of times to execute the expression listed in expr = . You can also use the pipe operator within the expr = operator if you want to replicate the execution of the entire pipeline n times\
+
+Introduction to Bootstrapping
+-More often than not, you cannot observe every value in the population, so you need a way to estimate the maining values that you cannot observe. This is bootstrapping
+  -The observations missing from the data set (but which are in the population) contain values that are represented in other observed values
+      -for example, animal A may be missing from the data set, but it should contain values (in this case traits) that other animals show (i.e., height, color, size)
+  -We can use the existing data to approximate the unknown values
+-Bootstrapping process in three steps
+  1. Make a resample of the same size as the original sample - The important thing here is that sampling is done WITH replacment
+  2. Calculate the statistic of interest for this bootstrap sample - can use more complex statistics than a mean/median
+  3. Repeat steps 1 and 2 many times to creat a bootstrapping distribution
+  -this is usually done using the replicate() function
+
+Confidence Intervals
+-

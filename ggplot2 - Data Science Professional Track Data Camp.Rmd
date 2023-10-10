@@ -1,0 +1,311 @@
+---
+title: "Working with ggplot2"
+author: "Carter Wolff"
+date: "2023-06-14"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The courses uses multiple datasets, including iris, mtcars, diamonds and more. Some of the datasets are available in base R
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(lattice)
+
+```
+
+---Ggplot2 Jargon
+ggplot2 operates using a strict graphing vocabulary, where words represent different layers of the graph. There are many layers in a graph, but the most common ones are listed below. They are listed in descending order with the most important attributes first:
+-Data: the source of data
+-Aesthetics (aes): the scales assigned to the graph, such as x and y values, or any grouping variable
+-Geometries (geom): what type of figure you use to represent your data (i.e., scatter, boxplot, etc...)
+-Themes (theme): non data portions of your graph such as titles, legends, etc...
+-Statistics (stat): representations of plotted data, such as a fitted line
+-coordinates (coord): specifying the space where the data is plotted (i.e., coord_flip() to flip x and y)
+-Facets (facet): plot subplots based on specified grouping element
+
+```{r}
+
+```
+
+---Aesthetics Jargon
+The most common aesthetics on a graph are x and y. However, ggplot can efficiently map additional variables, by specifying additional aesthetics. Some of these aesthetics include:
+-x: x axis position
+-y: y axis position
+-fill: Fill color
+-color: color of points/outliers. color usually represents the outline of a shape or a point
+-size: area/radius of shapes or thickness of lines
+-alpha: transparency
+-linetype: pattern of line
+-labels: text on a plot or axis
+-shape: shape of an object
+
+---Attributes versus Aesthetics
+-Attributes and aesthetics are named the same in ggplot. For example, you can have a color aesthetic and a color attribute. While aesthetics can be called in either in the ggplot or geom layer, attributes are only called in the geom layer. This is because they define the characteristics of the geom that you define. If it is geom_point for example, the size, shape, and color of the point all are attributes that can be manipulated. However, attributes are not mapped separately by a third variable. That process is done via aesthetics using the aes() function.
+-Due to this relationship, it is a common error for people to override their mapping aesthetic with a statically defined attribute or sometimes another aesthetic
+
+Modifying Aesthetics - Postion
+one of the most common adjustments to mapping asthetics is the adjustment of postions. There are many ways to do this including: 
+-identity: default position. The value in the data frame is exact to the position of the plot (i.e. don't adjust anything when plotting)
+-dodge:
+-stack:
+-fill:
+-jitter: an argument that 
+-jitterdodge:
+-nudge:
+
+Modifying Aesthetics - Scale functions
+-since aesthetics are represented as scales, you use the scale function to modify each scale.
+-The syntax for scale is Scale_x_continuous. The second term (i.e., x) specifies what aesthetic you are targeting while the third defines the action to that target.
+
+Visualizeing layered data in ggplot2
+-you can represent multiple datasets on a single figure with ggplot. It works by creating multiple geom layers. For example, you can create a scatter plot of all of the data from your data set, and then add a second geom_point to link to another dataset that contains the means/medians of those categories. An example of this is shown below with the iris data set. In the example. the aesthetics of the second geom_point is inherited from the initial ggplot function, so only the data source is altered. This requires varnames to be the same across datasets.
+
+```{r}
+glimpse(iris)
+
+iris.summary <- iris %>%
+  select(Species, Sepal.Length, Sepal.Width)%>%
+  group_by(Species)%>%
+  summarize(Sepal.Length = mean(Sepal.Length), Sepal.Width = mean(Sepal.Width))
+
+glimpse(iris.summary)
+
+ggplot(iris, aes(Sepal.Length, y = Sepal.Width, col = Species))+
+  geom_point()+ #first geometry to plot scatter plot of all data - taken from iris data set
+  geom_point(data = iris.summary, shape = 15, size = 5) #secone geom_point takes data from the iris.summary(i.e., the means) and plots points
+  
+```
+Histograms
+-You can add a "density" y value in to histograms instead of the count by specifying after_stat(density) in the aes() function. See below.
+
+```{r}
+ggplot(mtcars, aes(mpg, after_stat(density))) +
+  geom_histogram(binwidth = 1)
+```
+
+
+---Themes
+-Themes can be categorized by three different groups: Text, Line, or Rectangle. All three of these represent non data arguments of your figure.
+-Each theme attribute is changed similar to other aspects of ggplot. By adding a layer using the "+" key
+-Theme attributes are organized in a hierarchy. That is to say that "axis.title.y.right" is nested within "axis.title.y" nested within "axis.title" nested within "text." So changing "text" would alter all downstream arguments.
+-changing an theme element works by using the "element_" syntax. Element_text() alters text based elements for example. You need to specify the attribute that you are altering inside the parentheses, such as axis.title.x = element_text(color = "blue")
+
+---Stats with Geom in ggplot
+-Two Broad categories in stats: 1) Called within geom layer and 2) called independently
+-Some geom layers call stat functions under the hood. Things like histograms call "count" to sort observations into different bins for the histogram. Geom_smooth can calculate error of the smooth line, if it is specified
+-the "span" argument in smoothing functions controls the amount of smoothing applied. Smoother lines occur with higher span values
+-LOESS for LM smoothing: Loess does not do well on short ranges of data.
+-If your data contains issues for a Linear regression, another option is to use quantile regression to model the median, rather than the mean (like what is done in lm). One place this might be useful is if your model contains heteroscadacity, which can violate linear models.
+-In geom_quantile, you can model specified quantiles such as the median (50%) and the 5% and 95% quantiles
+
+```{r}
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+ geom_point()+
+ geom_smooth(method = "lm", se = FALSE) #fits a linear model on the scatter plot and removes error which is 95% CI by default. The default methods is a loess function
+
+#showing three different span values to change the level of smoothing
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+  geom_point() +
+  # Add 3 smooth LOESS stats, varying span & color
+  stat_smooth(se = FALSE, color = "red", span = 0.9) +
+  stat_smooth(se = FALSE, color = "green", span = 0.6) +
+  stat_smooth(se = FALSE, color = "blue", span = 0.3)
+
+#Modeling with quantile regression, using the 5%, 50%, and 95% quantiles
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+  geom_jitter(alpha = 0.25) +
+  # Add a quantile stat, at 0.05, 0.5, and 0.95
+  stat_quantile(quantiles = c(0.05, 0.5, 0.95))
+```
+
+Stat_summary()
+-The stat_summary function allows you to compare your ggplot to summary statistics, like mean or median. The syntax for the stat summary function is as follows:
+stat_summary(fun.data= , fun.args = , geom = , width)
+-fun.data: the type of summary function. In ggplot, mean is represented as mean_sdl
+-fun.args: the arguments for the function specified in fun.data. These arguments need to be passed to fun.args as a list
+    -fun.args = list(mult = 1), specifies 1 sd from the mean
+-geom: the type of geomotry to apply to the function, such as geom = "errorbar" to apply errorbars to the data. The DEFAULT geom is "pointrange"
+-width: the with of the geom
+
+---The Coor Functions
+-These are functions that control the coordinates of the plot. They are denoted by the syntax, coord_ such as coord_flip()
+-you can only apply one coord layer to each plot. So if you use coord_flip(), you couldn't use coor_cartersian() for example
+
+```{r}
+#original plot using mtcars data set - without any alterations from coor functions
+ggplot(mtcars, aes(x = wt, y = hp, color = fam)) +
+  geom_point() +
+  geom_smooth() 
+
+#zoom in a range of x values
+ggplot(mtcars, aes(x = wt, y = hp, color = fam)) +
+  geom_point() +
+  geom_smooth() +
+  # Add Cartesian coordinates with x limits from 3 to 6
+  coord_cartesian(xlim = c(3,6))
+
+#fix the aspect ratio to be 1:1
+ggplot(iris, aes(x = Sepal.Length, y = Sepal.Width, color = Species)) +
+  geom_jitter() +
+  geom_smooth(method = "lm", se = FALSE) +
+  # Fix the coordinate ratio
+  coord_fixed(ratio = 1)
+```
+
+Scale vs Coord functions
+-scale and coord are both used to transform the way data appears on a plot, but do so in different ways. Scale transforms the data BEFORE plotting the data, effectively altering the data. Coord maintains the original data, but alters the axis range for x and y values. Meaning if you calculate a mean on your data set and apply a log transformation, using scale will calculate the mean on log values, while coord will calculate the mean on normal values and plot them on a log scale. An example of this is shown below. The example also applies a linear smoothing function to show how a linear regression behaves under both transformations. This is a great example of how coord transformations can be deceptive, giving functions are applied on normal data, but are plotted against a log axis:
+
+```{r}
+#original plot with linear smoothing function
+ggplot(msleep, aes(bodywt, brainwt)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+#adding a log10 scale to x and y using the scale function
+ggplot(msleep, aes(bodywt, brainwt)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  # Add a log10 x scale
+  scale_x_log10() +
+  # Add a log10 y scale
+  scale_y_log10() +
+  ggtitle("Scale functions")
+
+#adding a log10 transformation to x and y axes using coord_trans()
+# Plot with transformed coordinates
+ggplot(msleep, aes(bodywt, brainwt)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  # Add a log10 coordinate transformation for x and y axes
+  coord_trans(x = "log10", y = "log10")+
+  ggtitle("Coord Functions")
+```
+
+Double and Flipped Axes
+-sometimes it is useful to add additional information in the form of a second axis. This uses the following code on the airquality data set, converting Fahrenheit temperatures to Celsius
+```{r}
+#create a Date column that will merge Month and Day
+airquality$Date <- as.Date(with(airquality, paste(Month, Day, sep = "-")), "%m-%d")
+
+#breaks take from data set to create even intervals
+y_breaks <- c(59, 68, 77, 86, 95, 104)
+y_labels <- (y_breaks - 32) * 5 / 9
+secondary_y_axis <- sec_axis(
+  trans = identity,
+  name = "Celsius",
+  breaks = y_breaks,
+  labels = y_labels
+)
+
+# Update the plot to include Celsius y-axis
+ggplot(airquality, aes(Date, Temp)) +
+  geom_line() +
+  # Add the secondary y-axis 
+  scale_y_continuous(sec.axis = secondary_y_axis) +
+  labs(x = "Date (1973)", y = "Fahrenheit")
+
+
+#an example of the usefulness of coord_flip, using the mtcars dataset. coord_flip places "cars on the y axis." 
+#This also can be done by reversing the x and y variables in aes()
+
+#assign row names of mtcars (car names) to its own column, "car"
+mtcars$car <- rownames(mtcars)
+
+#plot wt ~ car
+ggplot(mtcars, aes(car, wt)) +
+  geom_point() +
+  labs(x = "car", y = "weight") +
+  coord_flip()
+
+```
+
+Polar Coordinates
+-Coord can be used to convert an x-y Cartesian plot to polar coordinates. This is helpful to create some figures, like pie charts. coord_polar takes an optional argument, theta, that that defines the variable (x or y) map the angle to.
+```{r}
+#convert a bar plot into a pie chart using coord_polar. From the mtcars dataset
+ggplot(mtcars, aes(x = 1, fill = factor(cyl))) +
+  # Reduce the bar width to 0.1
+  geom_bar(width = 0.1) +
+  coord_polar(theta = "y")
+```
+
+---The Facets layer
+The facets layer is based on the concept of splitting up a large plot into smaller plots with the same axis. The individual plots represent a specific variable grouping of the larger data set.
+-facet_grid: split a plot into a row or column, define by a variable in the data set. Inside the facet_grid argument, you can define if you want your plots to form a column or row. For example in the iris dataset, facet_grid(cols = vars(Species)) will create a plot for each species and the plots will be separated by column, such that the splots are lined up side by side.
+  -a different way to split inside the facet function is to you "~" as the divider. In the case of facet_grid, everything to the left of ~ will split into rows and       everything on the right will split into columns. Use "." if you don't wish to separate on that side of the ~. For example, facet_grid(rows = vars(a)) ==               facet_grid(a ~ .) and facet_grid(cols = vars(b)) == facet_grid(. ~ b) and facet_grid(rows = vars(a), cols = vars(b)) == facet_grid(a ~ b)
+  -a simplistic view of the format for facet_grid is shown here: plot + facet_grid(rows = vars(A), cols = vars(B))
+-nonfactor variables are coerced to factor by ggplot when specified in the facet functions
+
+-You can label individual facets using the labeller function inside facet_grid().
+  labeller = label_both: displays value and variable name
+  labeller = label_context: displays only the values unless multiple variables are faceted in the same col/row, in which case it will display variable name and value
+-you can also reorder items, using the function fct_relevel.
+
+-additional arguments to apply to facet functions:
+  -scales = : This will define the scales within each facet. scales = free will allow each individual panel unique scales. Similary true for "free_x" and "free_y"
+    scales = "fixed" is the default. So by default, all panels have the same axes scale
+  -space = : allows each facet to be different sizes. Applicable when a categorical variable is not observed in one of the levels of the faceted variable (see below)
+  
+-facet_wrap versus facet_grid
+  -facet_wrap works when you want all individual plots to have their own x and y axes OR when a categorical variable has multiple levels. This would be overwhelming     with facet
+```{r}
+#version 1 using facet_grid and defining cols/rows = vars()
+ggplot(mtcars, aes(wt, mpg)) + 
+  geom_point() +
+  # Facet rows by am and columns by cyl
+  facet_grid(rows = vars(am), cols = vars(cyl))
+
+#version 2 using the .~ notation
+ggplot(mtcars, aes(wt, mpg)) + 
+  geom_point() +
+  # Facet rows by am using formula notation
+  facet_grid(am ~ .)
+
+##reordering and relabeling facets in mtcars
+#Unlabeled plot
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  facet_grid(cols = vars(cyl))
+
+#apply label_both to labeller argument inside facet_grid. This will display both variable name and the level of the variable cyl
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  # Displaying both the values and the variables
+  facet_grid(cols = vars(cyl), labeller = label_both)
+
+#apply label_context to labeller argument. since vs and cyl are faceted into columns, label_context will specify the variable name AND value
+# Plot wt by mpg
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  # Two variables
+  facet_grid(cols = vars(vs, cyl), labeller = label_context)
+
+##reorder facets manual by creating a new variable with user defined labels
+#fam is a string representation of the var, am for automatic or manual transmission.
+#the order is manualled assigned in the levels statement
+mtcars$fam <- factor(mtcars$am, levels = c(1, 0), labels = c("manual", "automatic"))
+
+# View again
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  facet_grid(cols = vars(fam))
+
+##adjusting the scale/shape of a facet to "unlock the y axis"
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() + 
+  facet_grid(rows = vars(cyl), scales = "free_y")
+
+ggplot(mtcars, aes(x = mpg, y = car, color = (factor(am)))) +
+  geom_point() +
+  # Free the y scales and space
+  facet_grid(rows = vars(gear), scales = "free_y", space = "free_y")
+
+#showing margins on a plot will include a facet that contains all data points
+```
+
+

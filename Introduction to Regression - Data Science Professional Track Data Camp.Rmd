@@ -1,0 +1,106 @@
+---
+title: "Introduction to Regression"
+author: "Carter Wolff"
+date: "2023-06-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This course focuses on linear and logistic regression with only one explanatory variable (simple linear/logistic regression).
+-Linear regression - response variable is numeric
+-Logistic regression - response variable is logical
+
+---CHP1: Simple Linear Regression
+Categorical explanatory variables
+-when using a categorical explanatory variable as a predictor for linear regression, R takes the mean of one level within your explanatory variable (usually the level with the middle mean). It treats that mean as intercept and then displays the coefficients of the other levels relative to that first (intercept) mean. This can altered by specifying "0" in the formula call in your model (i.e., y ~ x + 0, data = data). The 0 indicates you do not have an intercept argument.
+
+---CHP2: Predictions and model objects
+-The predict() function is a common function used to predict values based on a model object and a set of explanatory values. This can be piped into a dataframe usually with mutate() from dplyr
+-Extrapolating data always has the caveat that models may perform poorly within certain ranges of data. For example, a model that predicts a negative mass value at x height would indicate a poor performance of the model for that range of x. Thus, it is important to make sure your model makes sense statistically and applicably. 
+
+Model Objects
+-printing a model will display the coefficients of the model, the intercept and slope, but there is a lot more information present in the model object.
+-some useful functions to extract information from lm() model objects
+  -coefficients(): extracts the coefficients from the model
+  -fitted(): takes the predictions from the data set used to create the fitted line
+  -residuals(): measure of accuracy which is the observed value minus the models predicted value
+  -summary(): a condensed collection of the information in the model including residuals, coefficients, and tests of significance about each coefficient, and metrics     about the models performance.
+-While the above functions are helpful, they can be conveluted to read. Instead, the broom package works to simplify the output of model objects. Also of note, broom extracts this model information into a dataframe which is easy to manipulate and visualize compared to base lm() returns.
+-some useful functions from the broom package are:
+  -glance(): returns model level values, such as degrees of freedom and AIC
+  -tidy(): returns the coefficients level values, such as the p-value and intercepts
+  -augment(): returns observation level values, such as residuals
+
+Regression to the mean
+-Regression to the mean is a statistical phenomenom rather than an actual model component, but it is important to recognize during regression analysis. 
+-The general concept revolves around the presence of extreme observations in your data set. If there is an extreme observation, y, at a value, x (in this example y ~ x), the next observation of y at value x would be less extreme. The general rule is that as more samples of y are taken at x, the value of y becomes less extreme or in other words, regresses towards the mean. This is based on the fact that natural randomness and chaos exist in the world that inteferes with data observations. This randomness and chaos is the reasoning for extreme observations, but they are also rare in nature, thus they are unlikely to repeat in resampled observations.
+-it is important to recognize this as a statistical concept, but treat it the same way your would treat anything else that could influence your model. It is context dependent from model to model, and it is your job to evaluate the importance of it in each case.
+
+Transformations to data
+-sometimes transformations are necessary, especially when a linear model is desired. There are a myriad of transformations, each of which are appropriate for different skews in data sets. It is also important to recognize the scientific justification behind some transformations, but that is highly variable based on the type of data you have. 
+-Although most of the time it is better to perform data transformations outside of the model call, you can specify a transformation inside of functions like lm(). 
+  -it requires an additional function most of the time, as some transformations like x-squared are read into R as x^2. This caret operator has other meanings that can    confuse your code. 
+    -Thus, the I() function is helpful here. I() can generally be interpreted as "read as is" for whatever is inside the function.
+      -this is usually only needed for transformations that include exponentiation
+
+---CHP3: Quantifying Model Fit
+Quantifying Model Fit
+-R-squared: proportion of variance of response variable explained by the explanatory variable(s) on a scale of 0-1 with 1 being a perfect fit.
+  -This can be accessed efficiently using glance() from the broom package
+-Residual standard error (RSE): a measure of the typical residuals for observations versus predicted models
+  -Also available from glance(), but it is listed as "sigma"
+-Root-mean-square-error (RMSE): does not wait the number of coefficients in your model. Not as robust compared to RSE for comparisons of models
+-In a data pipeline, you can pull out individual model components (i.e., the r-squared value) using the pull() function
+
+Visualizing Model Fit
+-Residuals plot: a plot of the residual values versus the fitted values
+-Q-Q plot: shows if the residuals follow a normal distribution. 
+-Scale-location plot: how do the size of the residuals change compared to the fitted values
+-drawing the plots are straightforwarded using the ggfortify package. In this package, the autoplot() function can draw one or all of these plots by specifying the which = argument. This argument is categorized using 1, 2, 3 for residuals, q-q, and scale-location plots respectively. 
+
+Outliers: Leverage and Influence
+-Leverage: outliers with extreme explanatory variables
+  -available from augment() in the broom package, listed as .hat
+-Influence: how much does a model change by removing a given outlier
+  -quantified as the cooks distance which takes into account the residual and the leverage of the observation
+  -also shown in the augment() function of the broom package, listed as .cooksd
+-reviewing outliers allows you to filter out outliers for a better fitting model.
+-outlier diagnostics can also be plotted using the autoplot() function in ggfortify. Here, you specify which = as 4:6 for each diagnostic. 
+
+CHP4: Simple Logistic Regression
+-This chapter takes everything learned so far with linear regression and applies it to logistic regression, when the response variable is binary
+-The lm() function for a linear model is replaced by a glm(). In glm() you specify the distribution in the family = argument. For logistic regression, the family is binomial
+
+Making predictions with logistic regression
+-follows a similar technique as that of linear regression predictions
+  -1. create a data set of explanatory variables used to make predictions
+  -2. call the predict() function with the glm model and data set of explanatory variables. The difference is that within the predict() function, a type = argument         needs to be specified. For logistic predictions, the type = "response" argument is used
+-one common approach to interpreting predictions is to determine a most likely outcome. Since a logistic regression represents the probabilty of an event occuring for values of your explanatory variable, you can round the probability up or down with the round() function. This will coerce the predicted values into a 0 or 1, which in logistic regression represents an event occuring (1) or not (0).
+-another approach is the odds ratio:
+  -The odds ratio is the probability something occurs/the probability that it does not. 
+  -this can be calculated for the predicted values and plotted on a separate plot to view the odds as a function of your explanatory variable(s)
+    -usually this plot contains a horizontal line at odds_ratio = 1 where the odds of occuring is just as likely as the odds of not occuring
+  -If you set the odds ratio to a log scale (log(y-axis)), the trend should follow a linear trend with your explanatory variable. The issue is that log odds ratio are    more difficult to interpret for odds, but easy to see how odds change with changes in explanatory variables
+-In summary, the four ways to apply predictions of a logistic regression are:
+  -1. Probability of event occuring
+  -2. Most likely outcome: rounding probability to 1 or 0
+  -3. Odds Ratio: Odds an event occurs versus not occuring
+  -4. Log odds ratio: Log transformed values of odds
+
+Quantifying logistic regression fit
+-Confussion matrix
+  -a prediction has four outcomes. 1) correctly predicting an event occuring, 2) correctly predicting an invent not occuring, 3) predicting an event occurs when it doesn't (false positive), 4) and predicting an event occurs when it did not (false negative).We can set this up in a 2 by 2 confusion matrix to assess the performance of our model
+  -to create a confusion matrix can be convoluted given that we to pull information out of different places of out model
+    -actual responses can be pulled from the data set. predicted responses can be pulled from the model using the most likely outcome approach specified in the previous section. with these two variables defined, you can use table(predicted_responses, actual_responses) to establish a confusion matrix
+  -the yardstick package in R allows us to take this one step further, passing our confusion matrix to conf_mat(). This will allow us to calculate different performance metrics and plot our data with autoplot like we did in linear regression
+-Performance metrics of confusion metrics
+  -1. Accuracy: compares number of true positives to number of true negatives in the model (i.e., proportion of correct predictions)
+      -Accuracy = (True Positives + True Negatives) / All observations (i.e., all quadrants of the confusion matrix) 
+  -2. Sensitivity: compares the actual positive responses to the predicted positive responses. This essentially evalues only one response at a time
+      -Sens = True Positives/(False Positives + True Positives)
+  -3. Specificity: opposite of sensitivity. What is the proportion of times we observed a true false event
+      -Spec = True Negatives/(False Negatives + True Negatives)
+      
